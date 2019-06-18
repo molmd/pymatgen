@@ -761,6 +761,8 @@ class GaussianOutput:
         self.resumes = []
         self.title = None
         self.bond_orders = {}
+        self.esp = {}
+        self.tensor = None
 
         coord_txt = []
         read_coord = 0
