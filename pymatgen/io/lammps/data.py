@@ -730,6 +730,7 @@ class LammpsData(MSONable):
                 warnings.warn("Undefined %s detected and removed" % k.lower())
                 df.dropna(subset=["type"], inplace=True)
                 df.reset_index(drop=True, inplace=True)
+                df = df.astype('int')
             df.index += 1
             topology[k] = df[SECTION_HEADERS[k]]
         topology = {k: v for k, v in topology.items() if not v.empty}
