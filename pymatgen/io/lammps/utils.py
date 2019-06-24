@@ -176,7 +176,7 @@ class PackmolRunner:
                  tolerance=2.0, filetype="xyz",
                  control_params={"maxit": 20, "nloop": 600},
                  auto_box=True, output_file="packed.xyz",
-                 bin="packmol"):
+                 bin="packmol",encode=False):
         """
         Args:
               mols:
@@ -197,6 +197,9 @@ class PackmolRunner:
               output_file:
                     output file name. The extension will be adjusted
                     according to the filetype
+              encode:
+                    fix for keeping the filenames as normal strings. if True, then
+                    filenames will be byte strings, which causes errors with pybel.
         """
         self.packmol_bin = bin.split()
         if not which(self.packmol_bin[-1]):
@@ -220,6 +223,7 @@ class PackmolRunner:
                 output_file.split(".")[0], self.control_params["filetype"])
         if self.boxit:
             self._set_box()
+        self.encode = encode
 
     def _format_param_val(self, param_val):
         """
@@ -264,10 +268,15 @@ class PackmolRunner:
             # write the structures of the constituent molecules to file and set
             # the molecule id and the corresponding filename in the packmol
             # input file.
-            for idx, mol in enumerate(self.mols):
-                filename = os.path.join(
-                    input_dir, '{}.{}'.format(
-                        idx, self.control_params["filetype"])).encode("ascii")
+                    for idx, mol in enumerate(self.mols):
+                if self.encode:
+                    filename = os.path.join(
+                        input_dir, '{}.{}'.format(
+                            idx, self.control_params["filetype"])).encode("ascii")
+                else:
+                    filename = os.path.join(
+                        input_dir, '{}.{}'.format(
+                            idx, self.control_params["filetype"]))
                 # pdb
                 if self.control_params["filetype"] == "pdb":
                     self.write_pdb(mol, filename, num=idx+1)
