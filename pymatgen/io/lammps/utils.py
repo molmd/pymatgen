@@ -268,7 +268,7 @@ class PackmolRunner:
             # write the structures of the constituent molecules to file and set
             # the molecule id and the corresponding filename in the packmol
             # input file.
-                    for idx, mol in enumerate(self.mols):
+            for idx, mol in enumerate(self.mols):
                 if self.encode:
                     filename = os.path.join(
                         input_dir, '{}.{}'.format(
