@@ -15,6 +15,7 @@ from pymatgen.util.coord import get_angle
 import scipy.constants as cst
 
 from pymatgen.electronic_structure.core import Spin
+
 """
 This module implements input and output processing from Gaussian.
 """
@@ -25,7 +26,6 @@ __version__ = '0.1'
 __maintainer__ = 'Shyue Ping Ong'
 __email__ = 'ongsp@ucsd.edu'
 __date__ = '8/1/15'
-
 
 float_patt = re.compile(r"\s*([+-]?\d+\.\d+)")
 
@@ -391,6 +391,7 @@ class GaussianInput:
         """
         Return the cartesian coordinates of the molecule
         """
+
         def to_s(x):
             return "%0.6f" % x
 
@@ -411,6 +412,7 @@ class GaussianInput:
                 instead of the z-matrix
 
         """
+
         def para_dict_to_string(para, joiner=" "):
             para_str = []
             # sorted is only done to make unittests work reliably
@@ -744,6 +746,20 @@ class GaussianOutput:
 
         bond_order_patt = re.compile(r"Wiberg bond index matrix in the NAO basis:")
 
+        esp_patt = re.compile(
+            r"^\s*(ESP charges|ESP atomic charges)")
+        esp_charge_patt = re.compile(
+            r'^\s+(\d+)\s+([A-Z][a-z]?)\s*(\S*)')
+        end_esp_patt = re.compile(
+            r'(Sum of ESP )(.*)(charges)\s*=\s*(\D)')
+        tensor_header_patt = re.compile(r"SCF GIAO Magnetic shielding tensor \(ppm\):")
+        tensor_patt = \
+            re.compile(r'^\s+(\d+)\s+([A-Z][a-z]?)\s*(Isotropic)\s*=\s+(\d+.?\d*)\s*(Anisotropy)\s*=\s*(\d+.?\d*)')
+        tensor_mat_patt = \
+            re.compile(r'^\s+[A-Z][A-Z]=\s+(\d+.?\d*)\s+[A-Z][A-Z]=\s+(\d+.?\d*)\s+[A-Z][A-Z]=\s+(\d+.?\d*)')
+        tensor_eigen_patt = re.compile(r'^\s+Eigenvalues:\s+(\d+.?\d*)\s+(\d+.?\d*)\s+(\d+.?\d*)')
+        end_tensor_patt = re.compile(r'^\s*(End of Minotr F.D. properties file)\s+(\d+)\s*(does not exist.)')
+
         self.properly_terminated = False
         self.is_pcm = False
         self.stationary_type = "Minimum"
@@ -761,8 +777,8 @@ class GaussianOutput:
         self.resumes = []
         self.title = None
         self.bond_orders = {}
-        self.esp = {}
-        self.tensor = None
+        self.esp_charges = {}
+        self.tensor = {}
 
         coord_txt = []
         read_coord = 0
@@ -783,6 +799,8 @@ class GaussianOutput:
         parse_bond_order = False
         input_structures = list()
         std_structures = list()
+        read_esp = False
+        read_tensor = False
 
         with zopen(filename) as f:
             for line in f:
@@ -866,12 +884,12 @@ class GaussianOutput:
                             for eigenline in eigen_txt:
                                 if "Alpha" in eigenline:
                                     self.eigenvalues[Spin.up] += [float(e)
-                                        for e in float_patt.findall(eigenline)]
+                                                                  for e in float_patt.findall(eigenline)]
                                 elif "Beta" in eigenline:
                                     if Spin.down not in self.eigenvalues:
                                         self.eigenvalues[Spin.down] = []
                                     self.eigenvalues[Spin.down] += [float(e)
-                                        for e in float_patt.findall(eigenline)]
+                                                                    for e in float_patt.findall(eigenline)]
                             eigen_txt = []
 
                     # read molecular orbital coefficients
@@ -918,8 +936,8 @@ class GaussianOutput:
                                 line = f.readline()
                                 # manage pop=regular case (not all MO)
                                 if nMO < self.num_basis_func and \
-                                    ("Density Matrix:" in line or
-                                     mo_coeff_patt.search(line)):
+                                        ("Density Matrix:" in line or
+                                         mo_coeff_patt.search(line)):
                                     end_mo = True
                                     warnings.warn("POP=regular case, matrix "
                                                   "coefficients not complete")
@@ -991,7 +1009,7 @@ class GaussianOutput:
                                                   float_patt.findall(line)))
                                 for i, ifreq in zip(range(0, len(values), 3),
                                                     ifreqs):
-                                    frequencies[ifreq]["mode"].extend(values[i:i+3])
+                                    frequencies[ifreq]["mode"].extend(values[i:i + 3])
                                 line = f.readline()
 
                         parse_freq = False
@@ -1084,6 +1102,12 @@ class GaussianOutput:
                     elif mulliken_patt.search(line):
                         mulliken_txt = []
                         read_mulliken = True
+                    elif esp_patt.search(line):
+                        esp_txt = []
+                        read_esp = True
+                    elif tensor_header_patt.search(line):
+                        tensor_txt = []
+                        read_tensor = True
                     elif not parse_forces and forces_on_patt.search(line):
                         parse_forces = True
                     elif freq_on_patt.search(line):
@@ -1119,10 +1143,49 @@ class GaussianOutput:
                                 if mulliken_charge_patt.search(line):
                                     m = mulliken_charge_patt.search(line)
                                     dic = {int(m.group(1)):
-                                           [m.group(2), float(m.group(3))]}
+                                               [m.group(2), float(m.group(3))]}
                                     mulliken_charges.update(dic)
                             read_mulliken = False
                             self.Mulliken_charges = mulliken_charges
+
+                    if read_esp:
+                        if not end_esp_patt.search(line):
+                            esp_txt.append(line)
+                        else:
+                            esp_charges = {}
+                            for line in esp_txt:
+                                if esp_charge_patt.search(line):
+                                    e = esp_charge_patt.search(line)
+                                    dic = {int(e.group(1)):
+                                               [e.group(2), float(e.group(3))]}
+                                    esp_charges.update(dic)
+                            read_esp = False
+                            self.esp_charges = esp_charges
+
+                    if read_tensor:
+                        if not end_tensor_patt.search(line):
+                            tensor_txt.append(line)
+                        else:
+                            tensor = {}
+                            latest_key = None
+                            for line in tensor_txt:
+                                if tensor_patt.search(line):
+                                    t = tensor_patt.search(line)
+                                    latest_key = int(t.group(1))
+                                    tensor[latest_key] = {'type': t.group(2),
+                                                          t.group(3): float(t.group(4)),
+                                                          t.group(5): float(t.group(6)),
+                                                          'tensor': []}
+                                if tensor_mat_patt.search(line):
+                                    t = tensor_mat_patt.search(line)
+                                    tensor_sub_list = [float(t.group(1)), float(t.group(2)), float(t.group(3))]
+                                    tensor[latest_key]['tensor'].append(tensor_sub_list)
+                                if tensor_eigen_patt.search(line):
+                                    t = tensor_eigen_patt.search(line)
+                                    eigen_list = [float(t.group(1)), float(t.group(2)), float(t.group(3))]
+                                    tensor[latest_key]['eigenvalues'] = eigen_list
+                            read_tensor = False
+                            self.tensor = tensor
 
         # store the structures. If symmetry is considered, the standard orientation
         # is used. Else the input orientation is used.
@@ -1169,6 +1232,10 @@ class GaussianOutput:
         d["is_pcm"] = self.is_pcm
         d["errors"] = self.errors
         d["Mulliken_charges"] = self.Mulliken_charges
+        if self.esp_charges:
+            d["ESP_charges"] = self.esp_charges
+        if self.tensor:
+            d["tensor"] = self.tensor
 
         unique_symbols = sorted(list(d["unit_cell_formula"].keys()))
         d["elements"] = unique_symbols
@@ -1259,7 +1326,7 @@ class GaussianOutput:
                         values = floatList(line.split())
                         data["energies"].append(values[-1])
                         for i, icname in enumerate(data["coords"]):
-                            data["coords"][icname].append(values[i+1])
+                            data["coords"][icname].append(values[i + 1])
                         line = f.readline()
                 else:
                     line = f.readline()
@@ -1402,7 +1469,7 @@ class GaussianOutput:
         d, plt = self.get_spectre_plot(sigma, step)
         plt.savefig(filename, format=img_format)
 
-    def to_input(self, mol=None,  charge=None,
+    def to_input(self, mol=None, charge=None,
                  spin_multiplicity=None, title=None, functional=None,
                  basis_set=None, route_parameters=None, input_parameters=None,
                  link0_parameters=None, dieze_tag=None, cart_coords=False):
