@@ -93,6 +93,39 @@ class LammpsDump(MSONable):
         d["data"] = self.data.to_json(orient="split")
         return d
 
+    def as_string(self,bound_type='pp'):
+        '''
+        Method for converting LammpsDump object into a string for writing to a file.
+        :param bound_type (str): boundary type; for most cases it will be 'pp' for periodic boundary
+        :return dump_string (str): all the information in the LammpsDump object in string form in the format of
+        the original dump file
+        '''
+        s_timestep = 'ITEM: TIMESTEP\n' + str(self.timestep)
+        s_natoms = 'ITEM: NUMBER OF ATOMS\n' + str(self.natoms)
+        bound_text = ''
+        for line in str(self.box).split('\n'):
+            bound_text = bound_text + line.split(' ')[0] + ' ' + line.split(' ')[1] + '\n'
+        bound_text = bound_text[:-1]
+        s_bounds = 'ITEM: BOX BOUNDS {} {} {}\n'.format(bound_type,bound_type,bound_type) + bound_text
+        data_list = [' '.join(line.split()) for line in self.data.to_string(index=False).split('\n')]
+        data_str = '\n'.join(data_list)
+        s_data = 'ITEM: ATOMS ' + data_str
+        dump_string = s_timestep + '\n' + s_natoms + '\n' + s_bounds + '\n' + s_data
+        return dump_string
+
+    def as_txt_file(self,filename,bound_type='pp',convert=None):
+        '''
+        Method for writing LammpsDump object to text file
+        :param filename (str): desired filename of the written file
+        :param bound_type (str): boundary type; defaults to 'pp'
+        :param convert: for future work on changing dump_style, defaults to None
+        :return: None
+        '''
+        if not convert:
+            with open(filename,'w') as file:
+                file.write(self.as_string(bound_type=bound_type))
+
+
 
 def parse_lammps_dumps(file_pattern):
     """
