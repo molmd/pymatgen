@@ -93,37 +93,48 @@ class LammpsDump(MSONable):
         d["data"] = self.data.to_json(orient="split")
         return d
 
-    def as_string(self,bound_type='pp'):
+    def as_string(self,bound_type='pp',convert=None):
         '''
-        Method for converting LammpsDump object into a string for writing to a file.
+        Method for converting LammpsDump object into a string for writing to a file. Meant to be used w/ as_txt_file method.
         :param bound_type (str): boundary type; for most cases it will be 'pp' for periodic boundary
+        :param convert (str or None): determines which file format the dump will output as.
+            Currently supports 'xyz' only. Defaults to None (same format as input dump file).
         :return dump_string (str): all the information in the LammpsDump object in string form in the format of
         the original dump file
         '''
-        s_timestep = 'ITEM: TIMESTEP\n' + str(self.timestep)
-        s_natoms = 'ITEM: NUMBER OF ATOMS\n' + str(self.natoms)
-        bound_text = ''
-        for line in str(self.box).split('\n'):
-            bound_text = bound_text + line.split(' ')[0] + ' ' + line.split(' ')[1] + '\n'
-        bound_text = bound_text[:-1]
-        s_bounds = 'ITEM: BOX BOUNDS {} {} {}\n'.format(bound_type,bound_type,bound_type) + bound_text
-        data_list = [' '.join(line.split()) for line in self.data.to_string(index=False).split('\n')]
-        data_str = '\n'.join(data_list)
-        s_data = 'ITEM: ATOMS ' + data_str
-        dump_string = s_timestep + '\n' + s_natoms + '\n' + s_bounds + '\n' + s_data
+        if not convert:
+            s_timestep = 'ITEM: TIMESTEP\n' + str(self.timestep)
+            s_natoms = 'ITEM: NUMBER OF ATOMS\n' + str(self.natoms)
+            bound_text = ''
+            for line in str(self.box).split('\n'):
+                bound_text = bound_text + line.split(' ')[0] + ' ' + line.split(' ')[1] + '\n'
+            bound_text = bound_text[:-1]
+            s_bounds = 'ITEM: BOX BOUNDS {} {} {}\n'.format(bound_type,bound_type,bound_type) + bound_text
+            data_list = [' '.join(line.split()) for line in self.data.to_string(index=False).split('\n')]
+            data_str = '\n'.join(data_list)
+            s_data = 'ITEM: ATOMS ' + data_str
+            dump_string = s_timestep + '\n' + s_natoms + '\n' + s_bounds + '\n' + s_data
+
+        if convert=='xyz':
+            s_natoms = str(self.natoms)
+            s_comments = 'Atoms. Timestep: ' + str(self.timestep)
+            s_data = '\n'.join([' '.join(line.split()) for line in self.data[['element','x','y','z']].to_string(index=False,header=False).split('\n')])
+            dump_string = '\n'.join([s_natoms,s_comments,s_data])
         return dump_string
 
-    def as_txt_file(self,filename,bound_type='pp',convert=None):
+    def as_txt_file(self,filename,bound_type='pp',convert=None,output=False):
         '''
-        Method for writing LammpsDump object to text file
+        Method for writing LammpsDump object to text file in various formats
         :param filename (str): desired filename of the written file
         :param bound_type (str): boundary type; defaults to 'pp'
-        :param convert: for future work on changing dump_style, defaults to None
+        :param convert (str or None): for changing dump style or file type; see as_string method for details
+        :param ouput (Bool): If True, prints current filename. Defaults to False
         :return: None
         '''
-        if not convert:
-            with open(filename,'w') as file:
-                file.write(self.as_string(bound_type=bound_type))
+        with open(filename,'w') as file:
+            file.write(self.as_string(bound_type=bound_type,convert=convert))
+        if output:
+            print('Wrote file named: ' + filename)
 
 
 
