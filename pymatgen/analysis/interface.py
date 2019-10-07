@@ -2,31 +2,23 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
-from pymatgen.analysis.elasticity.strain import Deformation
-from pymatgen.core.surface import (SlabGenerator,
-                                   get_symmetrically_distinct_miller_indices)
+"""
+This module provides classes to store, generate, and manipulate material interfaces.
+"""
+
+from pymatgen.core.surface import SlabGenerator
 from pymatgen import Lattice, Structure
 from pymatgen.core.surface import Slab
 from itertools import product
 import numpy as np
-from pymatgen import Element
-from pymatgen.analysis.adsorption import AdsorbateSiteFinder, get_mi_vec
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from pymatgen.util.coord import pbc_shortest_vectors
 from matplotlib import pyplot as plt
 from pymatgen.core.operations import SymmOp
 from matplotlib.lines import Line2D
 from pymatgen.io.vasp.inputs import Poscar
-from pymatgen.analysis.substrate_analyzer import (SubstrateAnalyzer,
-                                                  gen_sl_transform_matricies,
-                                                  rel_strain, rel_angle,
-                                                  fast_norm, vec_angle, vec_area,
-                                                  reduce_vectors, get_factors)
+from pymatgen.core.sites import PeriodicSite
+from pymatgen.analysis.substrate_analyzer import (SubstrateAnalyzer, reduce_vectors)
 import warnings
-
-"""
-This module provides classes to store, generate, and manipulate material interfaces.
-"""
 
 __author__ = "Eric Sivonxay, Shyam Dwaraknath, and Kyle Bystrom"
 __copyright__ = "Copyright 2019, The Materials Project"
@@ -42,20 +34,22 @@ class Interface(Structure):
     This class stores data for defining an interface between two structures.
     It is a subclass of pymatgen.core.structure.Structure.
     """
-    
+
     def __init__(self, lattice, species, coords,
                  sub_plane, film_plane,
-                 sub_init_cell, film_init_cell, site_properties,
+                 sub_init_cell, film_init_cell,
                  modified_sub_structure, modified_film_structure,
                  strained_sub_structure, strained_film_structure,
                  validate_proximity=False,
                  coords_are_cartesian=False,
                  init_inplane_shift=None,
-                 charge=None):
+                 charge=None,
+                 site_properties=None,
+                 to_unit_cell=False):
         """
         Makes an interface structure, a Structure object with additional
         information and methods pertaining to interfaces.
-        
+
         Args:
             lattice (Lattice/3x3 array): The lattice, either as a
                 :class:`pymatgen.core.lattice.Lattice` or
@@ -96,9 +90,10 @@ class Interface(Structure):
                 in the plane of the interface.
             charge (float, optional): overal charge of the structure
         """
-        
+
         super().__init__(
             lattice, species, coords, validate_proximity=validate_proximity,
+            to_unit_cell=to_unit_cell,
             coords_are_cartesian=coords_are_cartesian,
             site_properties=site_properties, charge=charge)
 
@@ -111,13 +106,13 @@ class Interface(Structure):
         self.sub_init_cell = sub_init_cell
         self.film_init_cell = film_init_cell
 
-        z_shift = np.min(self.film.cart_coords[:,2]) - np.max(self.substrate.cart_coords[:,2])
+        z_shift = np.min(self.film.cart_coords[:, 2]) - np.max(self.substrate.cart_coords[:, 2])
 
         if init_inplane_shift is None:
             init_inplane_shift = np.array([0.0, 0.0])
 
         self._offset_vector = np.append(init_inplane_shift, [z_shift])
-        
+
     def shift_film_along_surface_lattice(self, da, db):
         """
         Given two floats da and db, adjust the shift vector
@@ -152,7 +147,6 @@ class Interface(Structure):
         if self.offset_vector[2] + delta[2] < 0 or delta[2] > self.vacuum_thickness:
             raise ValueError("The shift {} will collide the film and substrate.".format(delta))
         self._offset_vector += np.array(delta)
-        print("SHIFT", delta)
         self.translate_sites(self.get_film_indices(),
                              delta, frac_coords=False, to_unit_cell=True)
 
@@ -203,8 +197,8 @@ class Interface(Structure):
         """
         Vacuum buffer above the film.
         """
-        return np.min(self.substrate.cart_coords[:,2]) + self.lattice.c - np.max(self.film.cart_coords[:,2])
-        
+        return np.min(self.substrate.cart_coords[:, 2]) + self.lattice.c - np.max(self.film.cart_coords[:, 2])
+
     @property
     def substrate_sites(self):
         """
@@ -215,14 +209,14 @@ class Interface(Structure):
             if 'substrate' in tag:
                 sub_sites.append(self.sites[i])
         return sub_sites
-    
+
     @property
     def substrate(self):
         """
         Return the substrate (Structure) of the interface.
         """
         return Structure.from_sites(self.substrate_sites)
-    
+
     def get_film_indices(self):
         """
         Retrieve the indices of the film sites
@@ -232,7 +226,7 @@ class Interface(Structure):
             if 'film' in tag:
                 film_sites.append(i)
         return film_sites
-    
+
     @property
     def film_sites(self):
         """
@@ -243,7 +237,7 @@ class Interface(Structure):
             if 'film' in tag:
                 film_sites.append(self.sites[i])
         return film_sites
-    
+
     @property
     def film(self):
         """
@@ -251,7 +245,7 @@ class Interface(Structure):
         """
         return Structure.from_sites(self.film_sites)
 
-    def copy(self):
+    def copy(self, site_properties=None):
         """
         Convenience method to get a copy of the structure, with options to add
         site properties.
@@ -259,13 +253,72 @@ class Interface(Structure):
         Returns:
             A copy of the Interface.
         """
+        props = self.site_properties
+        if site_properties:
+            props.update(site_properties)
         return Interface(self.lattice, self.species_and_occu, self.frac_coords,
                          self.sub_plane, self.film_plane,
-                         self.sub_init_cell, self.film_init_cell, self.site_properties,
+                         self.sub_init_cell, self.film_init_cell,
                          self.modified_sub_structure, self.modified_film_structure,
                          self.strained_sub_structure, self.strained_film_structure,
                          validate_proximity=False, coords_are_cartesian=False,
-                         init_inplane_shift=self.offset_vector[:2], charge=self.charge)
+                         init_inplane_shift=self.offset_vector[:2], charge=self.charge,
+                         site_properties=self.site_properties)
+
+    def get_sorted_structure(self, key=None, reverse=False):
+        """
+        Get a sorted copy of the structure. The parameters have the same
+        meaning as in list.sort. By default, sites are sorted by the
+        electronegativity of the species.
+
+        Args:
+            key: Specifies a function of one argument that is used to extract
+                a comparison key from each list element: key=str.lower. The
+                default value is None (compare the elements directly).
+            reverse (bool): If set to True, then the list elements are sorted
+                as if each comparison were reversed.
+        """
+        struct_copy = self.copy()
+        struct_copy.sort(key=key, reverse=reverse)
+        return struct_copy
+
+    def as_dict(self):
+        """
+        :return: MSONable dict
+        """
+        d = super().as_dict()
+        d["@module"] = self.__class__.__module__
+        d["@class"] = self.__class__.__name__
+        d["sub_plane"] = self.sub_plane
+        d["film_plane"] = self.film_plane
+        d["sub_init_cell"] = self.sub_init_cell
+        d["film_init_cell"] = self.film_init_cell
+        d["modified_sub_structure"] = self.modified_sub_structure
+        d["modified_film_structure"] = self.modified_film_structure
+        d["strained_sub_structure"] = self.strained_sub_structure
+        d["strained_film_structure"] = self.strained_film_structure
+        d['init_inplane_shift'] = self.offset_vector[0:2]
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        """
+        :param d: Dict representation
+        :return: Interface
+        """
+        lattice = Lattice.from_dict(d["lattice"])
+        sites = [PeriodicSite.from_dict(sd, lattice) for sd in d["sites"]]
+        s = Structure.from_sites(sites)
+
+        return Interface(
+            lattice=lattice,
+            species=s.species_and_occu, coords=s.frac_coords,
+            sub_plane=d["sub_plane"], film_plane=d["film_plane"],
+            sub_init_cell=d["sub_init_cell"], film_init_cell=d["film_init_cell"],
+            modified_sub_structure=d["modified_sub_structure"], modified_film_structure=d["modified_film_structure"],
+            strained_sub_structure=d["strained_sub_structure"], strained_film_structure=d["strained_film_structure"],
+            site_properties=s.site_properties, init_inplane_shift=d["init_inplane_shift"]
+        )
 
 
 class InterfaceBuilder:
@@ -298,7 +351,8 @@ class InterfaceBuilder:
         self.substrate_structures = []
         self.film_structures = []
 
-        # "slab" structure (with no vacuum) oriented with a direction along x-axis and ab plane normal aligned with z-axis
+        # "slab" structure (with no vacuum) oriented with a direction along x-axis and ab plane normal aligned with
+        # z-axis
         self.oriented_substrate = None
         self.oriented_film = None
 
@@ -352,7 +406,6 @@ class InterfaceBuilder:
         _poscar = Poscar(self.original_substrate_structure)
         _poscar.write_file('bulk_substrate_POSCAR')
 
-
         _poscar = Poscar(self.original_film_structure)
         _poscar.write_file('bulk_film_POSCAR')
 
@@ -364,12 +417,12 @@ class InterfaceBuilder:
 
         for i, interface in enumerate(self.modified_substrate_structures):
             _poscar = Poscar(interface)
-            _poscar.write_file('slab_substrate_%d_POSCAR'%i)
+            _poscar.write_file('slab_substrate_%d_POSCAR' % i)
 
         for i, interface in enumerate(self.modified_film_structures):
             _poscar = Poscar(interface)
             _poscar.write_file('slab_film_%d_POSCAR' % i)
-            
+
         for i, interface in enumerate(self.film_structures):
             _poscar = Poscar(interface)
             _poscar.write_file('slab_unit_film_%d_POSCAR' % i)
@@ -422,10 +475,9 @@ class InterfaceBuilder:
         # Generate all possible interface matches
         self.matches = list(sa.calculate(self.original_film_structure, self.original_substrate_structure, **kwargs))
         match = self.matches[match_index]
-        print(match)
 
         # Generate substrate slab and align x axis to (100) and slab normal to (001)
-        ## Get no-vacuum structure for strained bulk calculation
+        # Get no-vacuum structure for strained bulk calculation
         self.sub_sg = SlabGenerator(self.original_substrate_structure, match['sub_miller'], substrate_layers, 0,
                                     in_unit_planes=True,
                                     reorient_lattice=False,
@@ -435,7 +487,7 @@ class InterfaceBuilder:
         self.oriented_substrate = align_x(no_vac_sub_slab)
         self.oriented_substrate.sort()
 
-        ## Get slab with vacuum
+        # Get slab with vacuum
         self.sub_sg = SlabGenerator(self.original_substrate_structure, match['sub_miller'], substrate_layers, 1,
                                     in_unit_planes=True,
                                     reorient_lattice=False,
@@ -450,7 +502,7 @@ class InterfaceBuilder:
         self.substrate_structures = sub_slabs
 
         # Generate film slab and align x axis to (100) and slab normal to (001)
-        ## Get no-vacuum structure for strained bulk calculation
+        # Get no-vacuum structure for strained bulk calculation
         self.film_sg = SlabGenerator(self.original_film_structure, match['film_miller'], film_layers, 0,
                                      in_unit_planes=True,
                                      reorient_lattice=False,
@@ -460,7 +512,7 @@ class InterfaceBuilder:
         self.oriented_film = align_x(no_vac_film_slab)
         self.oriented_film.sort()
 
-        ## Get slab with vacuum
+        # Get slab with vacuum
         self.film_sg = SlabGenerator(self.original_film_structure, match['film_miller'], film_layers, 1,
                                      in_unit_planes=True,
                                      reorient_lattice=False,
@@ -501,7 +553,7 @@ class InterfaceBuilder:
         self.strained_substrate, self.strained_film = strain_slabs(self.oriented_substrate, self.oriented_film)
 
         return
-                               
+
     def apply_transformation(self, structure, matrix):
         """
         Make a supercell of structure using matrix
@@ -554,16 +606,12 @@ class InterfaceBuilder:
                 modified_film_structure.apply_operation(reflection, fractional=True)
             self.oriented_film.apply_operation(reflection, fractional=True)
 
-        # ------------------------------------------------------------------------------------------------------------------------
-
         sub_scaling = np.diag(np.diag(sub_transformation))
-        sub_shearing = np.dot(np.linalg.inv(sub_scaling), sub_transformation)
 
         # Turn into 3x3 Arrays
         sub_scaling = np.diag(np.append(np.diag(sub_scaling), 1))
         temp_matrix = np.diag([1, 1, 1])
         temp_matrix[:2, :2] = sub_transformation
-        sub_shearing = temp_matrix
 
         for modified_substrate_structure in modified_substrate_structures:
             modified_substrate_structure = self.apply_transformation(modified_substrate_structure, temp_matrix)
@@ -571,21 +619,17 @@ class InterfaceBuilder:
 
         self.oriented_substrate = self.apply_transformation(self.oriented_substrate, temp_matrix)
 
-        # ------------------------------------------------------------------------------------------------------------------------
-
         film_scaling = np.diag(np.diag(film_transformation))
-        film_shearing = np.dot(np.linalg.inv(film_scaling), film_transformation)
 
         # Turn into 3x3 Arrays
         film_scaling = np.diag(np.append(np.diag(film_scaling), 1))
         temp_matrix = np.diag([1, 1, 1])
         temp_matrix[:2, :2] = film_transformation
-        film_shearing = temp_matrix
 
         for modified_film_structure in modified_film_structures:
             modified_film_structure = self.apply_transformation(modified_film_structure, temp_matrix)
             self.modified_film_structures.append(modified_film_structure)
-                               
+
         self.oriented_film = self.apply_transformation(self.oriented_film, temp_matrix)
 
         return
@@ -608,9 +652,8 @@ class InterfaceBuilder:
                 translation = [0, 0, -min(mirrored_slab.frac_coords[:, 2])]
                 mirrored_slab.translate_sites(range(mirrored_slab.num_sites), translation)
                 all_substrate_variants.append(mirrored_slab)
-                sub_labels.append('%dm'%i)
-                
-                               
+                sub_labels.append('%dm' % i)
+
         all_film_variants = []
         film_labels = []
         for i, slab in enumerate(self.modified_film_structures):
@@ -624,7 +667,7 @@ class InterfaceBuilder:
                 translation = [0, 0, -min(mirrored_slab.frac_coords[:, 2])]
                 mirrored_slab.translate_sites(range(mirrored_slab.num_sites), translation)
                 all_film_variants.append(mirrored_slab)
-                film_labels.append('%dm'%i)
+                film_labels.append('%dm' % i)
 
         # substrate first index, film second index
         self.interfaces = []
@@ -649,7 +692,7 @@ class InterfaceBuilder:
         # NOTE: CHANGED THIS TO MAKE COPY OF SUBSTRATE/FILM, self.modified_film_structures NO LONGER STRAINED
         unstrained_slab_substrate = slab_substrate.copy()
         slab_substrate = slab_substrate.copy()
-        unstrained_slab_film= slab_film.copy()
+        unstrained_slab_film = slab_film.copy()
         slab_film = slab_film.copy()
         latt_1 = slab_substrate.lattice.matrix.copy()
         latt_1[2, :] = [0, 0, 1]
@@ -687,18 +730,18 @@ class InterfaceBuilder:
 
         if not orthogonal_structure.is_valid(tol=1):
             warnings.warn("Check generated structure, it may contain atoms too closely placed")
-                               
-        #offset_vector = (offset[1], offset[2], offset[0])
+
+        # offset_vector = (offset[1], offset[2], offset[0])
         interface = Interface(orthogonal_structure.lattice.copy(), orthogonal_structure.species,
                               orthogonal_structure.frac_coords,
                               slab_substrate.miller_index, slab_film.miller_index,
                               self.original_substrate_structure, self.original_film_structure,
-                              orthogonal_structure.site_properties,
                               unstrained_slab_substrate, unstrained_slab_film,
-                              slab_substrate, slab_film, init_inplane_shift=offset[1:])
+                              slab_substrate, slab_film, init_inplane_shift=offset[1:],
+                              site_properties=orthogonal_structure.site_properties)
 
         return interface
-                               
+
     def visualize_interface(self, interface_index=0, show_atoms=False, n_uc=2):
         """
         Plot the film-substrate superlattice match, the film superlattice,
@@ -715,10 +758,11 @@ class InterfaceBuilder:
         sub_index = int(self.interface_labels[interface_index][2])
         visualize_interface(self.interfaces[interface_index], show_atoms, n_uc)
         visualize_superlattice(self.film_structures[film_index], self.modified_film_structures[film_index],
-                              film=True, show_atoms=show_atoms, n_uc=n_uc)
+                               film=True, show_atoms=show_atoms, n_uc=n_uc)
         visualize_superlattice(self.substrate_structures[sub_index], self.modified_substrate_structures[sub_index],
-                              film=False, show_atoms=show_atoms, n_uc=n_uc)
-                               
+                               film=False, show_atoms=show_atoms, n_uc=n_uc)
+
+
 def visualize_interface(interface, show_atoms=False, n_uc=2):
     """
     Plot the match of the substrate and film superlattices.
@@ -730,8 +774,8 @@ def visualize_interface(interface, show_atoms=False, n_uc=2):
             (The unit cell of the interface is the supercell of th substrate
             that matches a supercel of the film.)
     """
-    #sub_struct = interface.sub_init_cell
-    #film_struct = interface.film_init_cell
+    # sub_struct = interface.sub_init_cell
+    # film_struct = interface.film_init_cell
     modified_sub_struct = interface.modified_sub_structure
     modified_film_struct = interface.modified_film_structure
     rotated_modified_film_structure = align_x(modified_film_struct.copy(),
@@ -778,6 +822,7 @@ def visualize_interface(interface, show_atoms=False, n_uc=2):
     plt.title('Superlattice Match')
     plt.legend(handles=legend_elements)
     plt.show()
+
 
 def visualize_superlattice(struct, modified_struct, film=True, show_atoms=False, n_uc=2):
     """
@@ -1009,10 +1054,10 @@ def third_vect(a, b):
     Returns:
         unit vector proportional to cross(a, b).
     """
-    c = np.cross(a, b);
+    c = np.cross(a, b)
     return c / np.linalg.norm(c)
 
-                               
+
 def get_shear_reduced_slab(slab):
     """
     Reduce the vectors of the slab plane according to the algorithm in
@@ -1026,7 +1071,6 @@ def get_shear_reduced_slab(slab):
         Slab object of identical structure to the input slab
         but rduced in-plane lattice vectors
     """
-    original_vectors = [slab.lattice.matrix[0], slab.lattice.matrix[1]]
     reduced_vectors = reduce_vectors(
         slab.lattice.matrix[0],
         slab.lattice.matrix[1])
