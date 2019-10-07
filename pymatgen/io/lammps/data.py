@@ -727,7 +727,9 @@ class LammpsData(MSONable):
                               columns=SECTION_HEADERS[k][1:])
             df["type"] = list(map(ff.maps[k].get, topo_labels[k]))
             if any(pd.isnull(df["type"])):  # Throw away undefined topologies
-                warnings.warn("Undefined %s detected and removed" % k.lower())
+                text = 'Undefined %s detected and remoded'.replace('%',k.lower())
+                print(text)
+                # warnings.warn(text) # This warning is broken, will want to fix in future
                 df.dropna(subset=["type"], inplace=True)
                 df.reset_index(drop=True, inplace=True)
                 df = df.astype('int')

@@ -23,12 +23,12 @@ else:
     file_pattern = '*.lammpstrj'
 
 if args.timestep:
-    fs_per_step = args.timestep
+    fs_per_step = float(args.timestep)
 else:
     fs_per_step = 1
 
 if args.cutoff_time:
-    cutoff_time = args.cutoff_time
+    cutoff_time = int(args.cutoff_time)
 else:
     cutoff_time = 500
 
@@ -160,11 +160,11 @@ print('MSD data written to: ' + out_file_name)
 # print(Test_data.head(11))
 
 # # Linear regression
-t = np.asarray(Data['Time'].drop(Data[Data.Time < cutoff_time].index)).reshape((-1,1))
-f_Dx = np.asarray(Data['msd_x'].drop(Data[Data.Time < cutoff_time].index))
-f_Dy = np.asarray(Data['msd_y'].drop(Data[Data.Time < cutoff_time].index))
-f_Dz = np.asarray(Data['msd_z'].drop(Data[Data.Time < cutoff_time].index))
-f_D = np.asarray(Data['msd'].drop(Data[Data.Time < cutoff_time].index))
+t = np.asarray(Data['Time'].drop(Data[pd.to_numeric(Data.Time) < cutoff_time].index)).reshape((-1,1))
+f_Dx = np.asarray(Data['msd_x'].drop(Data[pd.to_numeric(Data.Time) < cutoff_time].index))
+f_Dy = np.asarray(Data['msd_y'].drop(Data[pd.to_numeric(Data.Time) < cutoff_time].index))
+f_Dz = np.asarray(Data['msd_z'].drop(Data[pd.to_numeric(Data.Time) < cutoff_time].index))
+f_D = np.asarray(Data['msd'].drop(Data[pd.to_numeric(Data.Time) < cutoff_time].index))
 
 # print(t)
 # print(f_Dx)
