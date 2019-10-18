@@ -137,6 +137,30 @@ class LammpsDump(MSONable):
             print('Wrote file named: ' + filename)
 
 
+def remove_unwrapped_coords(file_name, new_file_name=None):
+    '''
+    Takes a dump file with many frames, removes the unwrapped coordinates and box images, and writes the new frames to
+    a single dump file.
+    :param file_name: (str) The file name of the original dump file
+    :param new_file_name: (str or None) The file name of the new dump file. If None, the name will be the same as that
+        of the original
+    :return: None
+    '''
+    Dump_strings = []
+    if not new_file_name:
+        new_file_name = file_name
+    Dumps = list(parse_lammps_dumps(file_name))
+    unwanted_columns = {'ix', 'iy', 'iz', 'xu', 'yu', 'zu'}
+    for Dump in Dumps:
+        columns = Dump.data.columns.values.tolist()
+        new_columns = [col for col in columns if col not in unwanted_columns]
+        Dump.data = Dump.data[new_columns]
+        Dump_strings.append(Dump.as_string())
+    Dump_string_full = '\n'.join(Dump_strings)
+
+    with open(new_file_name, 'w') as f:
+        f.write(Dump_string_full)
+
 
 def parse_lammps_dumps(file_pattern):
     """
