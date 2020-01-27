@@ -1246,7 +1246,8 @@ class GaussianOutput:
         vin = {"route": self.route_parameters, "functional": self.functional,
                "basis_set": self.basis_set,
                "nbasisfunctions": self.num_basis_func,
-               "pcm_parameters": self.pcm}
+               "pcm_parameters": self.pcm,
+               "link0_parameters": self.link0}
 
         d["input"] = vin
 
@@ -1260,6 +1261,10 @@ class GaussianOutput:
             "stationary_type": self.stationary_type,
             "corrections": self.corrections
         }
+        if self.esp_charges:
+            vout["ESP_charges"] = self.esp_charges
+        if self.tensor:
+            vout["tensor"] = self.tensor
 
         d['output'] = vout
         d["@module"] = self.__class__.__module__
@@ -1507,6 +1512,41 @@ class GaussianOutput:
 
         if not dieze_tag:
             dieze_tag = self.dieze_tag
+
+        return GaussianInput(mol=mol,
+                             charge=charge,
+                             spin_multiplicity=spin_multiplicity,
+                             title=title,
+                             functional=functional,
+                             basis_set=basis_set,
+                             route_parameters=route_parameters,
+                             input_parameters=input_parameters,
+                             link0_parameters=link0_parameters,
+                             dieze_tag=dieze_tag)
+
+    @staticmethod
+    def from_dict_to_input(d):
+        """
+          Create a new input object from a gaussian output dictionary using the
+          last geometry read in the output file and with the same calculation
+          parameters. Arguments are the same as GaussianInput class.
+
+          Args:
+              d: Json-serializable dict representation of a gaussian output
+
+          Returns:
+              gaunip (GaussianInput) : the gaussian input object
+          """
+        mol = Molecule.from_dict(d['output']['molecule'])
+        charge = d.get('charge')
+        spin_multiplicity = d.get('spin_multiplicity')
+        title = d.get('title')
+        functional = d.get('input', {}).get('functional')
+        basis_set = d.get('input', {}).get('basis_set')
+        route_parameters = d.get('input', {}).get('route')
+        link0_parameters = d.get('input', {}).get('link0_parameters')
+        input_parameters = d.get('input', {}).get('input_parameters')
+        dieze_tag = d.get('input', {}).get('dieze_tag')
 
         return GaussianInput(mol=mol,
                              charge=charge,
