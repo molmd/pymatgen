@@ -329,12 +329,16 @@ class PhaseDiagram(MSONable):
                 energy, energy_per_atom and composition.
             elements ([Element]): Optional list of elements in the phase
                 diagram. If set to None, the elements are determined from
-                the the entries themselves.
+                the the entries themselves and are sorted alphabetically.
+                If specified, element ordering (e.g. for pd coordinates)
+                is preserved.
         """
         if elements is None:
             elements = set()
             for entry in entries:
                 elements.update(entry.composition.elements)
+            elements = sorted(list(elements))
+
         elements = list(elements)
         dim = len(elements)
 
@@ -1484,7 +1488,6 @@ class PDPlotter:
         x1, x2, y1 = None, None, None
         for i, d in enumerate(evolution):
             v = -(d["chempot"] - element_energy)
-            print("index= %s, -\u0394\u03BC=%.4f(eV)," % (i, v), d["reaction"])
             if i != 0:
                 plt.plot([x2, x2], [y1, d["evolution"] / num_atoms],
                          'k', linewidth=2.5)

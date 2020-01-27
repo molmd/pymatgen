@@ -654,7 +654,7 @@ class Vasprun(MSONable):
         TODO: Fix for other functional types like PW91, other vdW types, etc.
         """
         GGA_TYPES = {"RE": "revPBE", "PE": "PBE", "PS": "PBESol", "RP": "RevPBE+PADE", "AM": "AM05", "OR": "optPBE",
-                     "BO": "optB88", "MK": "optB86b", "--": "None or LDA"}
+                     "BO": "optB88", "MK": "optB86b", "--": "GGA"}
 
         METAGGA_TYPES = {"TPSS": "TPSS", "RTPSS": "revTPSS", "M06L": "M06-L", "MBJ": "modified Becke-Johnson",
                          "SCAN": "SCAN", "MS0": "MadeSimple0", "MS1": "MadeSimple1", "MS2": "MadeSimple2"}
@@ -669,15 +669,13 @@ class Vasprun(MSONable):
             rt = "B3LYP"
         elif self.parameters.get("LHFCALC", True):
             rt = "PBEO or other Hybrid Functional"
-        elif self.parameters.get("BPARAM", 15.70) == 15.70 and self.parameters.get("LUSE_VDW", True):
+        elif self.parameters.get("LUSE_VDW", False):
             if self.incar.get("METAGGA", "").strip().upper() in METAGGA_TYPES:
-                rt = GGA_TYPES[self.parameters.get("GGA", "").strip().upper()] + "+" + \
-                     METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()] + "+rVV10"
+                rt = METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()] + "+rVV10"
             else:
                 rt = GGA_TYPES[self.parameters.get("GGA", "").strip().upper()] + "+rVV10"
         elif self.incar.get("METAGGA", "").strip().upper() in METAGGA_TYPES:
-            rt = GGA_TYPES[self.parameters.get("GGA", "").strip().upper()] + "+" + \
-                 METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()]
+            rt = METAGGA_TYPES[self.incar.get("METAGGA", "").strip().upper()]
             if self.is_hubbard or self.parameters.get("LDAU", True):
                 rt += "+U"
         elif self.potcar_symbols[0].split()[0] == 'PAW':
@@ -2102,7 +2100,7 @@ class Outcar:
         # therefore regex assumes f, but filter out None values if d
 
         header_pattern = r"spin component  1\n"
-        row_pattern = r'[^\S\r\n]*(?:([\d.-]+)[^\S\r\n]*)' + r'(?:([\d.-]+)[^\S\r\n]*)?' * 6 + r'.*?'
+        row_pattern = r'[^\S\r\n]*(?:([\d.-]+))' + r'(?:[^\S\r\n]*(-?[\d.]+)[^\S\r\n]*)?' * 6 + r'.*?'
         footer_pattern = r"\nspin component  2"
         spin1_component = self.read_table_pattern(header_pattern, row_pattern,
                                                   footer_pattern, postprocess=lambda x: float(x) if x else None,
@@ -2114,7 +2112,7 @@ class Outcar:
         # and repeat for Spin.down
 
         header_pattern = r"spin component  2\n"
-        row_pattern = r'[^\S\r\n]*(?:([\d.-]+)[^\S\r\n]*)' + r'(?:([\d.-]+)[^\S\r\n]*)?' * 6 + r'.*?'
+        row_pattern = r'[^\S\r\n]*(?:([\d.-]+))' + r'(?:[^\S\r\n]*(-?[\d.]+)[^\S\r\n]*)?' * 6 + r'.*?'
         footer_pattern = r"\n occupancies and eigenvectors"
         spin2_component = self.read_table_pattern(header_pattern, row_pattern,
                                                   footer_pattern, postprocess=lambda x: float(x) if x else None,
@@ -3122,7 +3120,8 @@ class VolumetricData(MSONable):
                         lines = []
                     else:
                         lines.append(" ")
-                f.write(" " + "".join(lines) + " \n")
+                if count % 5 != 0:
+                    f.write(" " + "".join(lines) + " \n")
                 f.write("".join(self.data_aug.get(data_type, [])))
 
             write_spin("total")
@@ -3261,7 +3260,7 @@ class VolumetricData(MSONable):
         with h5py.File(filename, "r") as f:
             data = {k: np.array(v) for k, v in f["vdata"].items()}
             structure = Structure.from_dict(json.loads(f.attrs["structure_json"]))
-            return VolumetricData(structure, data)
+            return cls(structure=structure, data=data)
 
 
 class Locpot(VolumetricData):
@@ -3724,7 +3723,7 @@ def get_band_structure_from_vasp_multiple_branches(dir_name, efermi=None,
                 branches.append(run.get_band_structure(efermi=efermi))
             else:
                 # It might be better to throw an exception
-                warnings.warn("Skipping {}. Unable to find {}".format(d=dir_name, f=xml_file))
+                warnings.warn("Skipping {}. Unable to find {}".format(dir_name, xml_file))
 
         return get_reconstructed_band_structure(branches, efermi)
     else:
