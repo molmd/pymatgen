@@ -54,8 +54,10 @@ def read_route_line(route):
             tok = route.split("/")
             functional = tok[0].split()[-1]
             basis_set = tok[1].split()[0]
-            for tok in [functional, basis_set, "/"]:
+            for tok in [functional, basis_set]:
                 route = route.replace(tok, "")
+        if "/ " in route:
+            route = route.replace("/ ", " ")
 
         for tok in route.split():
             if scrf_patt.match(tok):
@@ -77,8 +79,11 @@ def read_route_line(route):
                         pars[p[0]] = None if len(p) == 1 else p[1]
                     route_params[m.group(1)] = pars
                 else:
-                    d = tok.strip("#").split("=")
-                    route_params[d[0]] = None if len(d) == 1 else d[1]
+                    if "iop" not in (tok.lower()):
+                        d = tok.strip("#").split("=")
+                        route_params[d[0]] = None if len(d) == 1 else d[1]
+                    else:
+                        route_params[tok] = None
 
     return functional, basis_set, route_params, dieze_tag
 
