@@ -1527,12 +1527,12 @@ class GaussianOutput:
     @staticmethod
     def from_dict_to_input(d):
         """
-          Create a new input object from a gaussian output dictionary using the
-          last geometry read in the output file and with the same calculation
-          parameters. Arguments are the same as GaussianInput class.
+          Create a new input object from a gaussian output dictionary. Arguments
+          are the same as GaussianInput class.
 
           Args:
-              d: Json-serializable dict representation of a gaussian output
+              d (dict): Json-serializable dict representation of a gaussian
+                        output
 
           Returns:
               gaunip (GaussianInput) : the gaussian input object
@@ -1546,7 +1546,7 @@ class GaussianOutput:
         route_parameters = d.get('input', {}).get('route')
         link0_parameters = d.get('input', {}).get('link0_parameters')
         input_parameters = d.get('input', {}).get('input_parameters')
-        dieze_tag = d.get('input', {}).get('dieze_tag')
+        dieze_tag = d.get('input', {}).get('dieze_tag', '#P')
 
         return GaussianInput(mol=mol,
                              charge=charge,
