@@ -54,10 +54,7 @@ def read_route_line(route):
             tok = route.split("/")
             functional = tok[0].split()[-1]
             basis_set = tok[1].split()[0]
-            for tok in [functional, basis_set]:
-                route = route.replace(tok, "")
-        if "/ " in route:
-            route = route.replace("/ ", " ")
+            route = route.replace(functional + '/' + basis_set, '')
 
         for tok in route.split():
             if scrf_patt.match(tok):
@@ -1540,7 +1537,7 @@ class GaussianOutput:
                         output
 
           Returns:
-              gaunip (GaussianInput) : the gaussian input object
+              gaunip (GaussianInput): the gaussian input object
           """
         mol = Molecule.from_dict(d['output']['molecule'])
         charge = d.get('charge')
