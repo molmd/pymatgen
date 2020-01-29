@@ -267,8 +267,10 @@ class GaussianInput:
     @staticmethod
     def from_string(contents):
         """
-        Creates GaussianInput from a string. Assumes the functional/basis_set to
-        be the first parameters on the route_parameters line.
+        Creates GaussianInput from a string. The functional/basis_set should
+        be the first parameters containing the "/" symbol on the
+        route_parameters line (e.g. #P Freq HF/6-31G(d) iop(7/32=1) instead of
+        #P Freq iop(7/32=1) HF/6-31G(d)).
 
         Args:
             contents: String representing an Gaussian input file.
@@ -333,8 +335,10 @@ class GaussianInput:
     @staticmethod
     def from_file(filename):
         """
-        Creates GaussianInput from a file. Assumes the functional/basis_set to
-        be the first parameters on the route_parameters line.
+        Creates GaussianInput from a file. The functional/basis_set should
+        be the first parameters containing the "/" symbol on the
+        route_parameters line (e.g. #P Freq HF/6-31G(d) iop(7/32=1) instead of
+        #P Freq iop(7/32=1) HF/6-31G(d)).
 
         Args:
             filename: Gaussian input filename
