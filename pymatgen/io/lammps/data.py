@@ -33,6 +33,7 @@ from monty.serialization import loadfn
 from ruamel.yaml import YAML
 
 from pymatgen.util.io_utils import clean_lines
+from pymatgen.io.lammps.utils import PackmolRunner
 from pymatgen import Molecule, Element, Lattice, Structure, SymmOp
 
 __author__ = "Kiran Mathew, Zhi Deng, Tingzheng Hou"
@@ -1386,6 +1387,113 @@ class CombinedData(LammpsData):
         info = '# ' + ' + '.join(str(a) + " " + b for a, b in zip(self.nums, self.names))
         lines.insert(1, info)
         return "\n".join(lines)
+
+
+def split_by_mol(n_atoms,n_mols,Mix,low_ind=0,Site_Prop=None,Molecules=[]):
+    '''
+    Breaks a Molecule object w/ many molecules into many Molecule objects w/ a single molecule each.
+    Not intended to be used directly, but part of LammpsDataWrapper class.
+
+    :param n_atoms (Int): The number of atoms in the molecule, from num_sites() method on Molecule w/ a single molecule
+    :param n_mols (Int): The number of molecules in the system,  from param_list['number'] property on PackmolRunner object (or input)
+    :param Mix (Molecule): The object w/ all molecules in the system, from PackmolRunner.run() output object
+    :param low_ind (Int): The index of the first atom in the molecule, defaults to 0
+    :param Site_Prop (Dict): For adding site_property to each single Molecule object, may want to include 'ff_label' and 'charge', defaults to None
+    :param Molecules (List): The initial list of single Molecule objects, defaults to []
+    :return: Molecules (List): The current list of single Molecule objects
+    :return: low_ind (Int): The current index
+    '''
+    upp_ind = low_ind + n_atoms
+    for i in range(n_mols):
+        Sites = Mix.sites[low_ind:upp_ind]
+        Mol = Molecule.from_sites(Sites)
+        if Site_Prop:
+            for key in Site_Prop.keys():
+                Mol.add_site_property(key,Site_Prop[key])
+        Molecules.append(Mol)
+        low_ind += n_atoms
+        upp_ind += n_atoms
+    return Molecules, low_ind
+
+
+def split_by_mult_mol(Pkml_mols,Pkml_parms,Mix,Site_props=None):
+    '''
+    Breaks a Molecule object w/ multiple kinds of molecules into many Molecule objects containing a single molecule each.
+        Intended to be used as part of LammpsDataWrapper class
+
+    :param Pkml_mols (list): list of Molecule objects, from PackmolRunner input or from PackmolRunner.mols
+    :param Pkml_parms (list): list of dicts, from PackmolRunner input or from PackmolRunner.param_list
+    :param Mix (Molecule): Molecule containing many molecules, from PackmolRunner.run()
+    :param Site_props (list): list of dicts, for adding site_properties to Molecules, should contain 'ff_label' and 'charge', defaults to None
+    :return: Molecules (list): list of Molecule objects containing a single molecule each.
+    '''
+    assert len(Pkml_mols) == len(Pkml_parms), \
+        "Length of input lists should be the same"
+
+    ind = 0
+    Molecules = []
+
+    if Site_props is not None:
+        assert len(Site_props) == len(Pkml_mols), \
+            "Length of existing site property list should be the same as input lists"
+
+        for i, mol in enumerate(Pkml_mols):
+            Molecules,ind = split_by_mol(mol.num_sites,Pkml_parms[i]['number'],Mix,low_ind=ind,Site_Prop=Site_props[i],Molecules=Molecules)
+        return Molecules
+    else:
+        for i, mol in enumerate(Pkml_mols):
+            Molecules,ind = split_by_mol(mol.num_sites,Pkml_parms[i]['number'],Mix,low_ind=ind,Molecules=Molecules)
+        return Molecules
+
+
+def Calc_Num_Mols(box_length,solute_list,solvent_list):
+    '''
+    Calculates the number of molecules for each molecular species in the system. This is important to obtain the input
+        information for the PackmolRunner class in pymatgen.io.lammps.utils. The desired output is the second element
+        of the output tuple
+    :param box_length: [float] the length of the system box in angstroms. Assumes a cubic box
+    :param solute_list: [list] contains Dictionaries with the following as keys: ['Initial Molarity', 'Final Molarity',
+        'Density', 'Molar Weight'] for each molecular species that is a solute (ie has a defined molarity). 'Initial Molarity'
+        and 'Final Molarity' will be equal unless some of the solute is transformed into another molecular species upon mixing
+        (eg 1 M DHPS in 4 M NaOH (aq) will become 1 M DHPS^-3, 4 M Na^+, 1 M OH^- after mixing; the 'Initial Molarity' of
+        OH^- is 4 and the 'Final Molarity' of OH^- is 1)
+    :param solvent_list: [list] the same as solute list, except there is no 'Initial Molarity' or 'Final Molarity' in the
+        keys. Currently only supports a solvent with one type of molecule (ie the length of this parameter should be 1)
+    :return: [tuple] Contains two elements. Both elements are lists of the number of molecules in the system, with the first
+        elements corresponding to those in the solute_list, and the last elements corresponding to those in the solvent list.
+        The first list is based on the 'Initial Molarity' of each solute molecule only. The purpose of this is mainly for
+        checking whether the correct number of molecules has been transferred to another component. The second list is the
+        desired output, which is based on the 'Final Molarity' of each solute. For the second list, the number of solvent
+        molecules is increased by the difference between the number of solute molecules from the 'Initial Molarity' and
+        'Final Molarity'
+    '''
+    # assert len(solvent_list) == 1
+    if len(solvent_list) != 1:
+        print(len(solvent_list))
+        raise ValueError('The length of the solvent list must be 1.')
+    avogadro = 6.02214086 * 10 ** 23 # mol^-1
+    volumes_initial = np.zeros(len(solute_list)+len(solvent_list))
+    volumes_final = volumes_initial.copy()
+    nmols_initial = volumes_initial.copy()
+    nmols_final = volumes_initial.copy()
+    for i, solute in enumerate(solute_list):
+        nmols_initial[i] = int(round(solute['Initial Molarity'] * avogadro * 10**3 * 10**-30 * box_length**3))
+        nmols_final[i] = int(round(solute['Final Molarity'] * avogadro * 10**3 * 10**-30 * box_length**3))
+        volumes_initial[i] = nmols_initial[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
+        volumes_final[i] = nmols_final[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
+    if solute_list:
+        volumes_initial[-1] = box_length**3 - np.sum(volumes_initial)
+    else:
+        volumes_initial[0] = box_length**3
+    extra_solvent = np.sum(np.subtract(nmols_initial,nmols_final))
+    # assert extra_solvent >= 0
+    if solute_list:
+        nmols_initial[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[-1]))
+        nmols_final[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[-1] + extra_solvent))
+    else:
+        nmols_initial[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[0]))
+        nmols_final[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[0] + extra_solvent))
+    return nmols_initial, nmols_final
 
 
 class LammpsDataWrapper:
