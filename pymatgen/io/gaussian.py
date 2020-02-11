@@ -701,6 +701,13 @@ class GaussianOutput:
         return self.energies[-1]
 
     @property
+    def initial_structure(self):
+        """
+        :returns: Initial structure in Gaussian output.
+        """
+        return self.structures[0]
+
+    @property
     def final_structure(self):
         return self.structures[-1]
 
@@ -1230,6 +1237,7 @@ class GaussianOutput:
         """
         Json-serializable dict representation.
         """
+        first_structure = self.initial_structure
         structure = self.final_structure
         d = {"has_gaussian_completed": self.properly_terminated,
              "nsites": len(structure)}
@@ -1254,7 +1262,8 @@ class GaussianOutput:
         vin = {"route": self.route_parameters, "dieze_tag": self.dieze_tag,
                "functional": self.functional, "basis_set": self.basis_set,
                "nbasisfunctions": self.num_basis_func,
-               "pcm_parameters": self.pcm, "link0_parameters": self.link0}
+               "pcm_parameters": self.pcm, "link0_parameters": self.link0,
+               "molecule": first_structure.as_dict()}
 
         d["input"] = vin
 
