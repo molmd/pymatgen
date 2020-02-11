@@ -705,10 +705,13 @@ class GaussianOutput:
         """
         :returns: Initial structure in Gaussian output.
         """
-        return self.structures[0]
+        return self.structures_input_orientation[0]
 
     @property
     def final_structure(self):
+        """
+        returns: Final structure in Gaussian output.
+        """
         return self.structures[-1]
 
     def _parse(self, filename):
