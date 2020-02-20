@@ -1559,7 +1559,7 @@ class GaussianOutput:
         mol = Molecule.from_dict(d['output']['molecule'])
         charge = d.get('charge')
         spin_multiplicity = d.get('spin_multiplicity')
-        title = d.get('title')
+        title = d.get('input', {}).get('title')
         functional = d.get('input', {}).get('functional')
         basis_set = d.get('input', {}).get('basis_set')
         route_parameters = d.get('input', {}).get('route')
