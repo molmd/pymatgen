@@ -1262,11 +1262,11 @@ class GaussianOutput:
         d["charge"] = self.charge
         d["spin_multiplicity"] = self.spin_multiplicity
 
-        vin = {"route": self.route_parameters, "dieze_tag": self.dieze_tag,
+        vin = {"route_parameters": self.route_parameters, "dieze_tag": self.dieze_tag,
                "functional": self.functional, "basis_set": self.basis_set,
                "nbasisfunctions": self.num_basis_func,
                "pcm_parameters": self.pcm, "link0_parameters": self.link0,
-               "molecule": first_structure.as_dict()}
+               "molecule": first_structure.as_dict(), "title": self.title}
 
         d["input"] = vin
 
