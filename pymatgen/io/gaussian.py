@@ -424,7 +424,7 @@ class GaussianInput:
         def para_dict_to_string(para, joiner=" "):
             para_str = []
             # sorted is only done to make unittests work reliably
-            for par, val in sorted(para.items()):
+            for par, val in para.items():
                 if val is None or val == "":
                     para_str.append(par)
                 elif isinstance(val, dict):
