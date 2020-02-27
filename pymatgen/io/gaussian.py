@@ -123,11 +123,14 @@ def read_route_line(route):
                     pars = {}
                     for par in m.group(2).split(","):
                         p = par.split("=")
-                        pars[p[0].strip()] = None if len(p) == 1 else p[1].strip()
+                        pars[p[0]] = None if len(p) == 1 else p[1]
                     route_params[m.group(1)] = pars
                 else:
-                    d = tok.strip("#").split("=")
-                    route_params[d[0]] = None if len(d) == 1 else d[1]
+                    if "iop" not in (tok.lower()):
+                        d = tok.strip("#").split("=")
+                        route_params[d[0]] = None if len(d) == 1 else d[1]
+                    else:
+                        route_params[tok] = None
     return functional, basis_set, route_params, dieze_tag
 
 
