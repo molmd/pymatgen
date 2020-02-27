@@ -30,6 +30,33 @@ __date__ = '8/1/15'
 float_patt = re.compile(r"\s*([+-]?\d+\.\d+)")
 
 
+def _handle_paranthesis(route):
+    opened = False
+    opened_index = None
+    opened_counter = 0
+    paranthesis_list = []
+    route2 = route
+    for i, j in enumerate(route):
+        if j == '(':
+            opened = True
+            opened_index = i
+        if j == ')' and opened:
+            opened = False
+            paranthesis_list.append(route[opened_index: i + 1])
+            route2 = route2.replace(route[opened_index: i + 1],
+                                    f'@RP{opened_counter}')
+            opened_counter += 1
+    return route2, paranthesis_list
+
+
+def _replace_parathesis(tok, paranthesis_list):
+    while '@RP' in tok:
+        index = tok.find('@RP')
+        tok = tok.replace(tok[index: index + 4],
+                          paranthesis_list[int(tok[index + 3])])
+    return tok
+
+
 def read_route_line(route):
     """
     read route line in gaussian input/output and return functional basis_set
@@ -50,13 +77,16 @@ def read_route_line(route):
     route_params = {}
     dieze_tag = None
     if route:
+        route, paranthesis_list = _handle_paranthesis(route)
         if "/" in route:
             tok = route.split("/")
             functional = tok[0].split()[-1]
             basis_set = tok[1].split()[0]
             route = route.replace(functional + '/' + basis_set, '')
-
+            functional = _replace_parathesis(functional, paranthesis_list)
+            basis_set = _replace_parathesis(basis_set, paranthesis_list)
         for tok in route.split():
+            tok = _replace_parathesis(tok, paranthesis_list)
             if scrf_patt.match(tok):
                 m = scrf_patt.match(tok)
                 route_params[m.group(1)] = m.group(2)
@@ -73,15 +103,11 @@ def read_route_line(route):
                     pars = {}
                     for par in m.group(2).split(","):
                         p = par.split("=")
-                        pars[p[0]] = None if len(p) == 1 else p[1]
+                        pars[p[0].strip()] = None if len(p) == 1 else p[1].strip()
                     route_params[m.group(1)] = pars
                 else:
-                    if "iop" not in (tok.lower()):
-                        d = tok.strip("#").split("=")
-                        route_params[d[0]] = None if len(d) == 1 else d[1]
-                    else:
-                        route_params[tok] = None
-
+                    d = tok.strip("#").split("=")
+                    route_params[d[0]] = None if len(d) == 1 else d[1]
     return functional, basis_set, route_params, dieze_tag
 
 
