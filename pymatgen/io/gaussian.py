@@ -30,11 +30,21 @@ __date__ = '8/1/15'
 float_patt = re.compile(r"\s*([+-]?\d+\.\d+)")
 
 
-def _handle_paranthesis(route):
+def _handle_parenthesis(route):
+    """
+    read route line in gaussian input/output, replace keywords between
+    parentheses with a placeholder, and return a list of these keywords
+    Args:
+        route (str): the route line
+
+    return:
+        route2 (str): modified route line
+        parenthesis_list (list): list of keywords between parentheses
+    """
     opened = False
     opened_index = None
     opened_counter = 0
-    paranthesis_list = []
+    parenthesis_list = []
     route2 = route
     for i, j in enumerate(route):
         if j == '(':
@@ -42,18 +52,28 @@ def _handle_paranthesis(route):
             opened_index = i
         if j == ')' and opened:
             opened = False
-            paranthesis_list.append(route[opened_index: i + 1])
+            parenthesis_list.append(route[opened_index: i + 1])
             route2 = route2.replace(route[opened_index: i + 1],
                                     f'@RP{opened_counter}')
             opened_counter += 1
-    return route2, paranthesis_list
+    return route2, parenthesis_list
 
 
-def _replace_parathesis(tok, paranthesis_list):
+def _replace_parenthesis(tok, parenthesis_list):
+    """
+    replace a placeholder in a string with a string taken from a list
+    Args:
+        tok (str): string containing a placeholder to replace
+        parenthesis_list (list): list of replacement strings
+
+    return:
+        tok (str): modified string
+
+    """
     while '@RP' in tok:
         index = tok.find('@RP')
         tok = tok.replace(tok[index: index + 4],
-                          paranthesis_list[int(tok[index + 3])])
+                          parenthesis_list[int(tok[index + 3])])
     return tok
 
 
@@ -77,16 +97,16 @@ def read_route_line(route):
     route_params = {}
     dieze_tag = None
     if route:
-        route, paranthesis_list = _handle_paranthesis(route)
+        route, parenthesis_list = _handle_parenthesis(route)
         if "/" in route:
             tok = route.split("/")
             functional = tok[0].split()[-1]
             basis_set = tok[1].split()[0]
             route = route.replace(functional + '/' + basis_set, '')
-            functional = _replace_parathesis(functional, paranthesis_list)
-            basis_set = _replace_parathesis(basis_set, paranthesis_list)
+            functional = _replace_parenthesis(functional, parenthesis_list)
+            basis_set = _replace_parenthesis(basis_set, parenthesis_list)
         for tok in route.split():
-            tok = _replace_parathesis(tok, paranthesis_list)
+            tok = _replace_parenthesis(tok, parenthesis_list)
             if scrf_patt.match(tok):
                 m = scrf_patt.match(tok)
                 route_params[m.group(1)] = m.group(2)
