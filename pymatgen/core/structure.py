@@ -2995,6 +2995,56 @@ class Structure(IStructure, collections.abc.MutableSequence):
                                  self.lattice, coords_are_cartesian=True)
             self._sites.append(s_new)
 
+    def link(self, mol, index, index_mol, bond_order=1):
+        """
+        Link two molecules by connecting one site from the first molecule
+        to another site from the second molecule.
+        Args:
+            mol: Molecule to connect to
+            index (int): Index of atom to connect to
+            index_mol (int): Index of atom in mol to connect to
+            bond_order (int): Bond order to calculate the bond length between
+            the connected molecule and the original molecule. Defaults to 1.
+
+        Returns:
+            Connected structure.
+
+        """
+        # Find the bond length between the connecting atoms.
+        bl = get_bond_length(self[index].specie, mol[index_mol].specie,
+                             bond_order=bond_order)
+
+        # Get a vector representation of each molecule and find the angle
+        # between the two vectors.
+        v1 = [0, 0, 0]
+        v2 = [0, 0, 0]
+        for i, j in enumerate(self.species):
+            v1 += self[index].coords - self[i].coords
+        for i, j in enumerate(mol.species):
+            v2 += mol[index_mol].coords - mol[i].coords
+        angle = get_angle(v1, v2)
+
+        # Make sure the angle between the two vectors is 180 to avoid having
+        # overlapping atoms.
+        if angle <= 179:
+            axis = np.cross(v1, v2)
+            op = SymmOp.from_origin_axis_angle(mol[index_mol].coords, axis,
+                                               180 - angle)
+            mol.apply_operation(op)
+
+        # Align the second molecule to the bonding atom in the first molecule
+        # and translate the second molecule so that the bond length is achieved
+        mol.translate_sites(list(range(len(mol))),
+                            self[index].coords - mol[index_mol].coords)
+        mol.translate_sites(list(range(len(mol))), float(bl) *
+                            v1/np.linalg.norm(v1))
+
+        # Create a new molecule using the existing sites in each molecule
+        all_sites = [site for site in self]
+        all_sites += [site for site in mol]
+        final_mol = Molecule.from_sites(all_sites)
+        return final_mol
+
     def remove_species(self, species):
         """
         Remove all occurrences of several species from a structure.
@@ -3745,3 +3795,6 @@ with open(os.path.join(os.path.dirname(__file__),
                        "func_groups.json"), "rt") as f:
     FunctionalGroups = {k: Molecule(v["species"], v["coords"])
                         for k, v in json.load(f).items()}
+
+
+
