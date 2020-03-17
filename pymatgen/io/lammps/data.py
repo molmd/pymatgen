@@ -6,7 +6,8 @@
 This module implements a core class LammpsData for generating/parsing
 LAMMPS data file, and other bridging classes to build LammpsData from
 molecules. This module also implements a subclass CombinedData for
-merging LammpsData object.
+merging LammpsData object, and a class LammpsDataWrapper for creating
+the LammpsData object.
 
 Only point particle styles are supported for now (atom_style in angle,
 atomic, bond, charge, full and molecular only). See the pages below for
@@ -32,14 +33,15 @@ from monty.serialization import loadfn
 from ruamel.yaml import YAML
 
 from pymatgen.util.io_utils import clean_lines
+from pymatgen.io.lammps.utils import PackmolRunner
 from pymatgen import Molecule, Element, Lattice, Structure, SymmOp
 
 __author__ = "Kiran Mathew, Zhi Deng, Tingzheng Hou"
 __copyright__ = "Copyright 2018, The Materials Virtual Lab"
-__version__ = "1.0"
-__maintainer__ = "Zhi Deng"
-__email__ = "z4deng@eng.ucsd.edu"
-__date__ = "Aug 1, 2018"
+__version__ = "1.1"
+__maintainer__ = "Zhi Deng, Matthew Bliss"
+__email__ = "z4deng@eng.ucsd.edu, mbliss01@tufts.edu"
+__date__ = "Jan 31, 2020"
 
 MODULE_DIR = Path(__file__).resolve().parent
 
@@ -1385,6 +1387,353 @@ class CombinedData(LammpsData):
         info = '# ' + ' + '.join(str(a) + " " + b for a, b in zip(self.nums, self.names))
         lines.insert(1, info)
         return "\n".join(lines)
+
+
+def split_by_mol(n_atoms,n_mols,Mix,low_ind=0,Site_Prop=None,Molecules=[]):
+    '''
+    Breaks a Molecule object w/ many molecules into many Molecule objects w/ a single molecule each.
+    Not intended to be used directly, but part of LammpsDataWrapper class.
+
+    :param n_atoms (Int): The number of atoms in the molecule, from num_sites() method on Molecule w/ a single molecule
+    :param n_mols (Int): The number of molecules in the system,  from param_list['number'] property on PackmolRunner object (or input)
+    :param Mix (Molecule): The object w/ all molecules in the system, from PackmolRunner.run() output object
+    :param low_ind (Int): The index of the first atom in the molecule, defaults to 0
+    :param Site_Prop (Dict): For adding site_property to each single Molecule object, may want to include 'ff_label' and 'charge', defaults to None
+    :param Molecules (List): The initial list of single Molecule objects, defaults to []
+    :return: Molecules (List): The current list of single Molecule objects
+    :return: low_ind (Int): The current index
+    '''
+    upp_ind = low_ind + n_atoms
+    for i in range(n_mols):
+        Sites = Mix.sites[low_ind:upp_ind]
+        Mol = Molecule.from_sites(Sites)
+        if Site_Prop:
+            for key in Site_Prop.keys():
+                Mol.add_site_property(key,Site_Prop[key])
+        Molecules.append(Mol)
+        low_ind += n_atoms
+        upp_ind += n_atoms
+    return Molecules, low_ind
+
+
+def split_by_mult_mol(Pkml_mols,Pkml_parms,Mix,Site_props=None):
+    '''
+    Breaks a Molecule object w/ multiple kinds of molecules into many Molecule objects containing a single molecule each.
+        Intended to be used as part of LammpsDataWrapper class
+
+    :param Pkml_mols (list): list of Molecule objects, from PackmolRunner input or from PackmolRunner.mols
+    :param Pkml_parms (list): list of dicts, from PackmolRunner input or from PackmolRunner.param_list
+    :param Mix (Molecule): Molecule containing many molecules, from PackmolRunner.run()
+    :param Site_props (list): list of dicts, for adding site_properties to Molecules, should contain 'ff_label' and 'charge', defaults to None
+    :return: Molecules (list): list of Molecule objects containing a single molecule each.
+    '''
+    assert len(Pkml_mols) == len(Pkml_parms), \
+        "Length of input lists should be the same"
+
+    ind = 0
+    Molecules = []
+
+    if Site_props is not None:
+        assert len(Site_props) == len(Pkml_mols), \
+            "Length of existing site property list should be the same as input lists"
+
+        for i, mol in enumerate(Pkml_mols):
+            Molecules,ind = split_by_mol(mol.num_sites,Pkml_parms[i]['number'],Mix,low_ind=ind,Site_Prop=Site_props[i],Molecules=Molecules)
+        return Molecules
+    else:
+        for i, mol in enumerate(Pkml_mols):
+            Molecules,ind = split_by_mol(mol.num_sites,Pkml_parms[i]['number'],Mix,low_ind=ind,Molecules=Molecules)
+        return Molecules
+
+
+def Calc_Num_Mols(box_length,solute_list,solvent_list):
+    '''
+    Calculates the number of molecules for each molecular species in the system. This is important to obtain the input
+        information for the PackmolRunner class in pymatgen.io.lammps.utils. The desired output is the second element
+        of the output tuple
+    :param box_length: [float] the length of the system box in angstroms. Assumes a cubic box
+    :param solute_list: [list] contains Dictionaries with the following as keys: ['Initial Molarity', 'Final Molarity',
+        'Density', 'Molar Weight'] for each molecular species that is a solute (ie has a defined molarity). 'Initial Molarity'
+        and 'Final Molarity' will be equal unless some of the solute is transformed into another molecular species upon mixing
+        (eg 1 M DHPS in 4 M NaOH (aq) will become 1 M DHPS^-3, 4 M Na^+, 1 M OH^- after mixing; the 'Initial Molarity' of
+        OH^- is 4 and the 'Final Molarity' of OH^- is 1)
+    :param solvent_list: [list] the same as solute list, except there is no 'Initial Molarity' or 'Final Molarity' in the
+        keys. Currently only supports a solvent with one type of molecule (ie the length of this parameter should be 1)
+    :return: [tuple] Contains two elements. Both elements are lists of the number of molecules in the system, with the first
+        elements corresponding to those in the solute_list, and the last elements corresponding to those in the solvent list.
+        The first list is based on the 'Initial Molarity' of each solute molecule only. The purpose of this is mainly for
+        checking whether the correct number of molecules has been transferred to another component. The second list is the
+        desired output, which is based on the 'Final Molarity' of each solute. For the second list, the number of solvent
+        molecules is increased by the difference between the number of solute molecules from the 'Initial Molarity' and
+        'Final Molarity'
+    '''
+    # assert len(solvent_list) == 1
+    if len(solvent_list) != 1:
+        print(len(solvent_list))
+        raise ValueError('The length of the solvent list must be 1.')
+    avogadro = 6.02214086 * 10 ** 23 # mol^-1
+    volumes_initial = np.zeros(len(solute_list)+len(solvent_list))
+    volumes_final = volumes_initial.copy()
+    nmols_initial = volumes_initial.copy()
+    nmols_final = volumes_initial.copy()
+    for i, solute in enumerate(solute_list):
+        nmols_initial[i] = int(round(solute['Initial Molarity'] * avogadro * 10**3 * 10**-30 * box_length**3))
+        nmols_final[i] = int(round(solute['Final Molarity'] * avogadro * 10**3 * 10**-30 * box_length**3))
+        volumes_initial[i] = nmols_initial[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
+        volumes_final[i] = nmols_final[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
+    if solute_list:
+        volumes_initial[-1] = box_length**3 - np.sum(volumes_initial)
+    else:
+        volumes_initial[0] = box_length**3
+    extra_solvent = np.sum(np.subtract(nmols_initial,nmols_final))
+    # assert extra_solvent >= 0
+    if solute_list:
+        nmols_initial[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[-1]))
+        nmols_final[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[-1] + extra_solvent))
+    else:
+        nmols_initial[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[0]))
+        nmols_final[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[0] + extra_solvent))
+    return nmols_initial, nmols_final
+
+
+class LammpsDataWrapper:
+    '''
+    Object for wrapping LammpsData object in pymatgen.io.lammps.data
+    '''
+
+    def __init__(self,system_force_fields,system_mixture_data,cube_length,origin=[0.,0.,0.],
+                 seed=150,packmolrunner_inputs={'input_file':'pack.inp','tolerance':2.0,'filetype':'xyz',
+                           'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
+                           'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
+                           'site_property':None},length_increase=0.5):
+        '''
+        Low level constructor designed to work with lists of dictionaries that should be able to be obtained from
+            databases. Works for cubic boxes only using real coordinates.
+        :param system_force_fields: [dict] Contains force field information using the following format:
+            { unique_molecule_name: {
+                'Molecule': pymatgen.Molecule,
+                'Labels': [atom_a, ...]
+                'Masses': [OrderedDict({species_1: mass_1, ...})],
+                'Nonbond': [[...], ...],
+                'Bonds': [{'coeffs': [...], 'types': [(i, j), ...]}, ...],
+                'Angles': [{'coeffs': [...], 'types': [(i, j, k), ...]}, ...],
+                'Dihedrals': [{'coeffs': [...], 'types': [(i, j, k, l), ...]}, ...],
+                'Impropers': [{'coeffs': [...], 'types': [(i, j, k, l), ...]}, ...],
+                'Improper Topologies': [[a, b, c, d],...]
+                'Charges': [atom_a, ...]
+            }, ...}
+        :param system_mixture_data: [dict] Contains molarity, density, and molar weights of solutes and solvents using
+            the following format:
+            {
+                'Solutes': {unique_molecule_name: {
+                                'Initial Molarity': molarity_1i,
+                                'Final Molarity': molarity_1f,
+                                'Density': density_1,
+                                'Molar Weight': molar_weight_1
+                            }, ...},
+                'Solvents': {unique_molecule_name: {
+                                'Initial Molarity': molarity_1i,
+                                'Final Molarity': molarity_1f,
+                                'Density': density_1,
+                                'Molar Weight': molar_weight_1
+                            }, ...}
+            }
+        :param cube_length: [float] length of system box in angstroms.
+        :param origin: [list] Optional. Change if the minimum xyz coordinates for desired box are not [0,0,0].
+        :param seed: [int] Optional. Sets the seed for running packmol.
+        :param packmolrunner_inputs: [dict] Optional. Parameters for PackmolRunner in pymatgen.io.lammps.utils
+        '''
+        self._ff_list = system_force_fields
+        if 'Solutes' in system_mixture_data.keys():
+            self._solutes = system_mixture_data['Solutes']
+
+        else:
+            self._solutes = {}
+        if 'Solvents' in system_mixture_data.keys():
+            self._solvents = system_mixture_data['Solvents']
+        else:
+            self._solvents = {}
+        self.length = cube_length
+        self._origin = origin
+
+        packmolrunner_inputs['control_params']['seed'] = seed
+        self._packmolrunner_inputs = packmolrunner_inputs
+
+        self._length_increase = length_increase
+
+    @property
+    def SortedNames(self):
+        '''
+        Sorts molecules from most to least number of atoms
+        :return molecule_name_list: [list] Contains the unique_molecule_names
+        '''
+        molecule_name_list = list(self._ff_list.keys())
+        molecule_natoms_list = [len(self._ff_list[name]['Molecule']) for name in molecule_name_list]
+        molecule_name_list.sort(key=dict(zip(molecule_name_list,molecule_natoms_list)).get,reverse=True)
+        return molecule_name_list
+
+    @property
+    def PackmolParamList(self):
+        '''
+        Prepares the param_list input for PackmolRunner in pymatgen.io.lammps.utils. Assumes that all molecules are put
+            in the same cube. Preserves the order of SortedNames; the molecule with the most atoms is first.
+        :return packmol_params: [list] Info about number of atoms and box coordinates for packmol in Dicts for each
+            molecule.
+        '''
+        # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
+        solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
+        solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
+        solute_list = [self._solutes[name] for name in solute_names]
+        solvent_list = [self._solvents[name] for name in solvent_names]
+
+        # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
+        nmolecules_initial, nmolecules_final = Calc_Num_Mols(self.length,solute_list,solvent_list)
+        nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
+
+        # # Create list of min and max xyz coords
+        xyz_high = list(np.add(self._origin,self.length))
+        box_xyz = self._origin + xyz_high
+
+        # # make packmol input list preserving the order of SortedNames
+        packmol_params = [{'number': int(nmol_dict[name]), 'inside box': box_xyz} for name in self.SortedNames]
+        return packmol_params
+
+    @property
+    def PackmolMolList(self):
+        '''
+        Prepares the mols input for PackmolRunner in pymatgen.io.lammps.utils. Preserves the order of SortedNames.
+        :return packmol_mols: [list] Contains pymatgen.Molecule objects for each molecule.
+        '''
+        packmol_mols = [self._ff_list[name]['Molecule'] for name in self.SortedNames]
+        return packmol_mols
+
+    @property
+    def NumMolecules(self):
+        '''
+        Contains the number of molecules in the system in the order based on the SortedNames list.
+        :return number_of_molecules: [list] Contains integers for each name in SortedNames list.
+        '''
+        number_of_molecules = [species['number'] for species in self.PackmolParamList]
+        return number_of_molecules
+
+    @property
+    def ForceField(self):
+        ''''''
+        # # Prepare OrderedDict for Masses
+        Masses_Ordered_Dict = OrderedDict()
+        for species in self.SortedNames:
+            temp_old_list = list(Masses_Ordered_Dict.items())
+            temp_append_list = list(self._ff_list[species]['Masses'].items())
+            if temp_old_list:
+                Masses_Ordered_Dict = OrderedDict(temp_old_list + temp_append_list)
+            else:
+                Masses_Ordered_Dict = OrderedDict(temp_append_list)
+
+        # # Prepare List of Nonbonded Parameters
+        Nonbonded_List_Of_Lists = [self._ff_list[species]['Nonbond'] for species in self.SortedNames]
+        Nonbonded_Param_List = list(itertools.chain(*Nonbonded_List_Of_Lists))
+
+        # # Prepare List of Bond Parameters
+        Bond_List_Of_Lists = [self._ff_list[species]['Bonds'] for species in self.SortedNames]
+        Bond_Param_List = list(itertools.chain(*Bond_List_Of_Lists))
+
+        # # Prepare List of Angle Parameters
+        Angle_List_Of_Lists = [self._ff_list[species]['Angles'] for species in self.SortedNames if self._ff_list[species]['Angles']]
+        Angle_Param_List = list(itertools.chain(*Angle_List_Of_Lists))
+
+        # # Prepare List of Dihedral Parameters
+        Dihedral_List_Of_Lists = [self._ff_list[species]['Dihedrals'] for species in self.SortedNames if self._ff_list[species]['Dihedrals']]
+        Dihedral_Param_List = list(itertools.chain(*Dihedral_List_Of_Lists))
+
+        # # Prepare List of Improper Parameters
+        Improper_List_Of_Lists = [self._ff_list[species]['Impropers'] for species in self.SortedNames if self._ff_list[species]['Impropers']]
+        Improper_Param_List = list(itertools.chain(*Improper_List_Of_Lists))
+
+        System_Bonded_Params = {}
+        if Bond_Param_List:
+            System_Bonded_Params['Bond Coeffs'] = Bond_Param_List
+        if Angle_Param_List:
+            System_Bonded_Params['Angle Coeffs'] = Angle_Param_List
+        if Dihedral_Param_List:
+            System_Bonded_Params['Dihedral Coeffs'] = Dihedral_Param_List
+        if Improper_Param_List:
+            System_Bonded_Params['Improper Coeffs'] = Improper_Param_List
+        # System_Bonded_Params = {'Bond Coeffs':Bond_Param_List,'Angle Coeffs':Angle_Param_List,'Dihedral Coeffs':Dihedral_Param_List,'Improper Coeffs':Improper_Param_List}
+        System_Force_Field_Params = ForceField(Masses_Ordered_Dict.items(),Nonbonded_Param_List,System_Bonded_Params)
+        return System_Force_Field_Params
+
+    def _run_packmol(self,verbose=False):
+        '''
+        Wrapper for PackmolRunner class in pymatgen.io.lammps.utils
+        :param verbose: [bool] Optional. If True, prints additional information
+        :return System_molecule_obj: [pmg.Molecule] The packed system in the form of a pymatgen Molecule.
+        '''
+        if verbose:
+            print('The seed is:', self._packmolrunner_inputs['control_params']['seed'])
+
+        Packmol_runner_obj = PackmolRunner(self.PackmolMolList,self.PackmolParamList,
+                                           input_file=self._packmolrunner_inputs['input_file'],
+                                           tolerance=self._packmolrunner_inputs['tolerance'],
+                                           filetype=self._packmolrunner_inputs['filetype'],
+                                           control_params=self._packmolrunner_inputs['control_params'],
+                                           auto_box=self._packmolrunner_inputs['auto_box'],
+                                           output_file=self._packmolrunner_inputs['output_file'],
+                                           bin=self._packmolrunner_inputs['bin'])
+
+        if verbose:
+            print('Running Packmol:')
+        System_molecule_obj = Packmol_runner_obj.run(copy_to_current_on_exit=self._packmolrunner_inputs['copy_to_current_on_exit'],
+                                                     site_property=self._packmolrunner_inputs['site_property'])
+        if verbose:
+            print('Packmol finished!')
+        return System_molecule_obj
+
+    def _get_topologies(self,System_molecule,verbose=False):
+        '''
+        Get list of pmg.Topology objects from pymatgen.io.lammps.data based on the output from the _run_packmol() method.
+        :param System_molecule: [Molecule] Output from _run_packmol()
+        :return system_individual_topologies: [list] list of pmg.Topology objects
+        '''
+        system_site_props = [{'ff_label':self._ff_list[name]['Labels'],
+                              'charge':list(self._ff_list[name]['Charges'])} for name in self.SortedNames]
+        system_individual_molecules = split_by_mult_mol(self.PackmolMolList,self.PackmolParamList,System_molecule,Site_props=system_site_props)
+        bins = np.subtract(np.cumsum(self.NumMolecules),1)
+        system_individual_topologies = []
+        if verbose:
+            print('Starting the topology list creation loop.')
+        for index, molecule in enumerate(system_individual_molecules):
+            bin_result = np.digitize(index, bins, right=True)
+            if verbose and index % 1000 == 0:
+                print('Current loop number:',index)
+                print(bin_result)
+            input_topology = Topology.from_bonding(molecule)
+            bin_result = np.digitize(index,bins,right=True)
+            if self._ff_list[self.SortedNames[bin_result]]['Improper Topologies']:
+                input_topology.topologies['Impropers'] = self._ff_list[self.SortedNames[bin_result]]['Improper Topologies']
+            output_topology = Topology(sites=molecule,ff_label='ff_label',charges=None,velocities=None,topologies=input_topology.topologies)
+            system_individual_topologies.append(output_topology)
+
+        return system_individual_topologies
+
+    def _get_lammps_box(self,System_molecule):
+        '''
+        Get pmg.LammpsBox object from pymatgen.io.lammps.data based on the output from the _run_packmol() method.
+        :param System_molecule: [Molecule] Output from _run_packmol()
+        :return Mix_lmpbox: [pmg.LammpsBox] Object representing the simulation box
+        '''
+        lattice_length = self.length + self._length_increase
+        Mix_lattice = System_molecule.get_boxed_structure(lattice_length,lattice_length,lattice_length).lattice
+        Mix_lmpbox, Mix_symopp = lattice_2_lmpbox(Mix_lattice)
+        return Mix_lmpbox
+
+    def MakeLammpsData(self,atom_style='full'):
+        ''''''
+        System_Molecule = self._run_packmol()
+        System_Topologies = self._get_topologies(System_Molecule)
+        System_Lammps_Box = self._get_lammps_box(System_Molecule)
+        System_Lammps_Data = LammpsData.from_ff_and_topologies(System_Lammps_Box,self.ForceField,System_Topologies,
+                                                               atom_style=atom_style)
+        return System_Lammps_Data
 
 
 @deprecated(LammpsData.from_structure,
