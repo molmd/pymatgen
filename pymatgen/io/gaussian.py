@@ -2,6 +2,10 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
+"""
+This module implements input and output processing from Gaussian.
+"""
+
 import re
 
 import numpy as np
@@ -16,16 +20,13 @@ import scipy.constants as cst
 
 from pymatgen.electronic_structure.core import Spin
 
-"""
-This module implements input and output processing from Gaussian.
-"""
-
 __author__ = 'Shyue Ping Ong, Germain  Salvato-Vallverdu, Xin Chen'
 __copyright__ = 'Copyright 2013, The Materials Virtual Lab'
 __version__ = '0.1'
 __maintainer__ = 'Shyue Ping Ong'
 __email__ = 'ongsp@ucsd.edu'
 __date__ = '8/1/15'
+
 
 float_patt = re.compile(r"\s*([+-]?\d+\.\d+)")
 
@@ -137,30 +138,6 @@ def read_route_line(route):
 class GaussianInput:
     """
     An object representing a Gaussian input file.
-
-    Args:
-        mol: Input molecule. If molecule is a single string, it is used as a
-            direct input to the geometry section of the Gaussian input
-            file.
-        charge: Charge of the molecule. If None, charge on molecule is used.
-            Defaults to None. This allows the input file to be set a
-            charge independently from the molecule itself.
-        spin_multiplicity: Spin multiplicity of molecule. Defaults to None,
-            which means that the spin multiplicity is set to 1 if the
-            molecule has no unpaired electrons and to 2 if there are
-            unpaired electrons.
-        title: Title for run. Defaults to formula of molecule if None.
-        functional: Functional for run.
-        basis_set: Basis set for run.
-        route_parameters: Additional route parameters as a dict. For example,
-            {'SP':"", "SCF":"Tight"}
-        input_parameters: Additional input parameters for run as a dict. Used
-            for example, in PCM calculations.  E.g., {"EPS":12}
-        link0_parameters: Link0 parameters as a dict. E.g., {"%mem": "1000MW"}
-        dieze_tag: # preceding the route line. E.g. "#p"
-        gen_basis: allows a user-specified basis set to be used in a Gaussian
-            calculation. If this is not None, the attribute ``basis_set`` will
-            be set to "Gen".
     """
 
     # Commonly used regex patterns
@@ -172,24 +149,68 @@ class GaussianInput:
                  functional="HF", basis_set="6-31G(d)", route_parameters=None,
                  input_parameters=None, link0_parameters=None, dieze_tag="#P",
                  gen_basis=None):
+        """
+        Args:
+            mol: Input molecule. It can either be a Molecule object,
+                a string giving the geometry in a format supported by Guassian,
+                or ``None``. If the molecule is ``None``, you will need to use
+                read it in from a checkpoint. Consider adding ``CHK`` to the
+                ``link0_parameters``.
+            charge: Charge of the molecule. If None, charge on molecule is used.
+                Defaults to None. This allows the input file to be set a
+                charge independently from the molecule itself.
+                If ``mol`` is not a Molecule object, then you must specify a charge.
+            spin_multiplicity: Spin multiplicity of molecule. Defaults to None,
+                which means that the spin multiplicity is set to 1 if the
+                molecule has no unpaired electrons and to 2 if there are
+                unpaired electrons. If ``mol`` is not a Molecule object, then you
+                 must specify the multiplicity
+            title: Title for run. Defaults to formula of molecule if None.
+            functional: Functional for run.
+            basis_set: Basis set for run.
+            route_parameters: Additional route parameters as a dict. For example,
+                {'SP':"", "SCF":"Tight"}
+            input_parameters: Additional input parameters for run as a dict. Used
+                for example, in PCM calculations.  E.g., {"EPS":12}
+            link0_parameters: Link0 parameters as a dict. E.g., {"%mem": "1000MW"}
+            dieze_tag: # preceding the route line. E.g. "#p"
+            gen_basis: allows a user-specified basis set to be used in a Gaussian
+                calculation. If this is not None, the attribute ``basis_set`` will
+                be set to "Gen".
+        """
         self._mol = mol
-        self.charge = charge if charge is not None else mol.charge
-        nelectrons = - self.charge + mol.charge + mol.nelectrons
-        if spin_multiplicity is not None:
-            self.spin_multiplicity = spin_multiplicity
-            if (nelectrons + spin_multiplicity) % 2 != 1:
-                raise ValueError(
-                    "Charge of {} and spin multiplicity of {} is"
-                    " not possible for this molecule".format(
-                        self.charge, spin_multiplicity))
+
+        # Determine multiplicity and charge settings
+        if isinstance(mol, Molecule):
+            self.charge = charge if charge is not None else mol.charge
+            nelectrons = - self.charge + mol.charge + mol.nelectrons
+            if spin_multiplicity is not None:
+                self.spin_multiplicity = spin_multiplicity
+                if (nelectrons + spin_multiplicity) % 2 != 1:
+                    raise ValueError(
+                        "Charge of {} and spin multiplicity of {} is"
+                        " not possible for this molecule".format(
+                            self.charge, spin_multiplicity))
+            else:
+                self.spin_multiplicity = 1 if nelectrons % 2 == 0 else 2
+
+            # Get a title from the molecule name
+            self.title = title if title else self._mol.composition.formula
         else:
-            self.spin_multiplicity = 1 if nelectrons % 2 == 0 else 2
+            if charge is None or spin_multiplicity is None:
+                raise ValueError('`charge` and `spin_multiplicity` must be specified')
+            self.charge = charge
+            self.spin_multiplicity = spin_multiplicity
+
+            # Set a title
+            self.title = title if title else 'Restart'
+
+        # Store the remaining settings
         self.functional = functional
         self.basis_set = basis_set
         self.link0_parameters = link0_parameters if link0_parameters else {}
         self.route_parameters = route_parameters if route_parameters else {}
         self.input_parameters = input_parameters if input_parameters else {}
-        self.title = title if title else self._mol.composition.formula
         self.dieze_tag = dieze_tag if dieze_tag[0] == "#" else "#" + dieze_tag
         self.gen_basis = gen_basis
         if gen_basis is not None:
@@ -355,7 +376,7 @@ class GaussianInput:
         title = ' '.join(title)
         ind += 1
         toks = re.split(r"[,\s]+", lines[route_index + ind])
-        charge = int(toks[0])
+        charge = int(float(toks[0]))
         spin_mult = int(toks[1])
         coord_lines = []
         spaces = 0
@@ -448,7 +469,6 @@ class GaussianInput:
         """
         Return the cartesian coordinates of the molecule
         """
-
         def to_s(x):
             return "%0.6f" % x
 
@@ -469,7 +489,6 @@ class GaussianInput:
                 instead of the z-matrix
 
         """
-
         def para_dict_to_string(para, joiner=" "):
             para_str = []
             # sorted is only done to make unittests work reliably
@@ -494,13 +513,13 @@ class GaussianInput:
         output.append("")
         output.append(self.title)
         output.append("")
-        output.append("{} {}".format(self.charge, self.spin_multiplicity))
+        output.append("%d %d" % (self.charge, self.spin_multiplicity))
         if isinstance(self._mol, Molecule):
             if cart_coords is True:
                 output.append(self.get_cart_coords())
             else:
                 output.append(self.get_zmatrix())
-        else:
+        elif self._mol is not None:
             output.append(str(self._mol))
         output.append("")
         if self.gen_basis is not None:
@@ -519,6 +538,9 @@ class GaussianInput:
             f.write(self.to_string(cart_coords))
 
     def as_dict(self):
+        """
+        :return: MSONable dict
+        """
         return {"@module": self.__class__.__module__,
                 "@class": self.__class__.__name__,
                 "molecule": self.molecule.as_dict(),
@@ -534,6 +556,10 @@ class GaussianInput:
 
     @classmethod
     def from_dict(cls, d):
+        """
+        :param d: dict
+        :return: GaussianInput
+        """
         return GaussianInput(mol=Molecule.from_dict(d["molecule"]),
                              functional=d["functional"],
                              basis_set=d["basis_set"],
@@ -548,9 +574,6 @@ class GaussianInput:
 class GaussianOutput:
     """
     Parser for Gaussian output files.
-
-    Args:
-        filename: Filename of Gaussian output file.
 
     .. note::
 
@@ -742,11 +765,18 @@ class GaussianOutput:
     """
 
     def __init__(self, filename):
+        """
+        Args:
+            filename: Filename of Gaussian output file.
+        """
         self.filename = filename
         self._parse(filename)
 
     @property
     def final_energy(self):
+        """
+        :return: Final energy in Gaussian output.
+        """
         return self.energies[-1]
 
     @property
@@ -787,7 +817,6 @@ class GaussianOutput:
             r'(Sum of Mulliken )(.*)(charges)\s*=\s*(\D)')
         std_orientation_patt = re.compile(r"Standard orientation")
         input_orientation_patt = re.compile(r"Input orientation")
-        end_patt = re.compile(r"--+")
         orbital_patt = re.compile(r"(Alpha|Beta)\s*\S+\s*eigenvalues --(.*)")
         thermo_patt = re.compile(r"(Zero-point|Thermal) correction(.*)="
                                  r"\s+([\d\.-]+)")
@@ -799,7 +828,6 @@ class GaussianOutput:
 
         freq_on_patt = re.compile(
             r"Harmonic\sfrequencies\s+\(cm\*\*-1\),\sIR\sintensities.*Raman.*")
-        freq_patt = re.compile(r"Frequencies\s--\s+(.*)")
 
         normal_mode_patt = re.compile(
             r"\s+(\d+)\s+(\d+)\s+([0-9\.-]{4,5})\s+([0-9\.-]{4,5}).*")
@@ -847,7 +875,6 @@ class GaussianOutput:
         self.esp_charges = {}
         self.tensor = {}
 
-        coord_txt = []
         read_coord = 0
         read_mulliken = False
         read_eigen = False
@@ -866,6 +893,7 @@ class GaussianOutput:
         parse_bond_order = False
         input_structures = list()
         std_structures = list()
+        geom_orientation = None
         read_esp = False
         read_tensor = False
 
@@ -950,18 +978,15 @@ class GaussianOutput:
                             self.eigenvalues = {Spin.up: []}
                             for eigenline in eigen_txt:
                                 if "Alpha" in eigenline:
-                                    self.eigenvalues[Spin.up] += [float(e)
-                                                                  for e in float_patt.findall(eigenline)]
+                                    self.eigenvalues[Spin.up] += [float(e) for e in float_patt.findall(eigenline)]
                                 elif "Beta" in eigenline:
                                     if Spin.down not in self.eigenvalues:
                                         self.eigenvalues[Spin.down] = []
-                                    self.eigenvalues[Spin.down] += [float(e)
-                                                                    for e in float_patt.findall(eigenline)]
+                                    self.eigenvalues[Spin.down] += [float(e) for e in float_patt.findall(eigenline)]
                             eigen_txt = []
 
                     # read molecular orbital coefficients
-                    if (not num_basis_found) and \
-                            num_basis_func_patt.search(line):
+                    if (not num_basis_found) and num_basis_func_patt.search(line):
                         m = num_basis_func_patt.search(line)
                         self.num_basis_func = int(m.group(1))
                         num_basis_found = True
@@ -1155,12 +1180,10 @@ class GaussianOutput:
                         m = scf_patt.search(line)
                         self.energies.append(float(m.group(1)))
                     elif std_orientation_patt.search(line):
-                        coord_txt = []
                         standard_orientation = True
                         geom_orientation = "standard"
                         read_coord = True
                     elif input_orientation_patt.search(line):
-                        coord_txt = []
                         geom_orientation = "input"
                         read_coord = True
                     elif not read_eigen and orbital_patt.search(line):
@@ -1492,7 +1515,7 @@ class GaussianOutput:
             A matplotlib plot.
         """
         from pymatgen.util.plotting import pretty_plot
-        from matplotlib.mlab import normpdf
+        from scipy.stats import norm
         plt = pretty_plot(12, 8)
 
         transitions = self.read_excitation_energies()
@@ -1508,7 +1531,7 @@ class GaussianOutput:
         # sum of gaussian functions
         spectre = np.zeros(npts)
         for trans in transitions:
-            spectre += trans[2] * normpdf(eneval, trans[0], sigma)
+            spectre += trans[2] * norm(eneval, trans[0], sigma)
         spectre /= spectre.max()
         plt.plot(lambdaval, spectre, "r-", label="spectre")
 
