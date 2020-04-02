@@ -1501,7 +1501,7 @@ class LammpsDataWrapper:
     Object for wrapping LammpsData object in pymatgen.io.lammps.data
     '''
 
-    def __init__(self,system_force_fields,system_mixture_data,cube_length,origin=[0.,0.,0.],
+    def __init__(self,system_force_fields,system_mixture_data,cube_length,mixture_data_type='concentration',origin=[0.,0.,0.],
                  seed=150,packmolrunner_inputs={'input_file':'pack.inp','tolerance':2.0,'filetype':'xyz',
                            'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
                            'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
@@ -1522,8 +1522,9 @@ class LammpsDataWrapper:
                 'Improper Topologies': [[a, b, c, d],...]
                 'Charges': [atom_a, ...]
             }, ...}
-        :param system_mixture_data: [dict] Contains molarity, density, and molar weights of solutes and solvents using
-            the following format:
+        :param system_mixture_data: [dict] Format depends on mixture_data_type input.
+            For mixture_data_type = 'concentration', this parameter contains molarity, density, and molar weights of
+            solutes and solvents using the following format:
             {
                 'Solutes': {unique_molecule_name: {
                                 'Initial Molarity': molarity_1i,
@@ -1538,21 +1539,36 @@ class LammpsDataWrapper:
                                 'Molar Weight': molar_weight_1
                             }, ...}
             }
+            For mixture_data_type = 'number of molecules', this parameter contains the number of molecules for each
+            species in the system in the following format:
+            {
+                unique_molecule_name: n_mols,
+                ...
+            }
+        :param mixture_data_type: [str] controls the format of the system_mixture_data parameter. Currently supports
+            values of 'concentration' and 'number of molecules'. Defaults to
         :param cube_length: [float] length of system box in angstroms.
         :param origin: [list] Optional. Change if the minimum xyz coordinates for desired box are not [0,0,0].
         :param seed: [int] Optional. Sets the seed for running packmol.
         :param packmolrunner_inputs: [dict] Optional. Parameters for PackmolRunner in pymatgen.io.lammps.utils
         '''
         self._ff_list = system_force_fields
-        if 'Solutes' in system_mixture_data.keys():
-            self._solutes = system_mixture_data['Solutes']
+        self._concentration_data = False
+        self._number_of_molecules_data = False
+        if mixture_data_type == 'concentration':
+            self._concentration_data = True
+            if 'Solutes' in system_mixture_data.keys():
+                self._solutes = system_mixture_data['Solutes']
 
-        else:
-            self._solutes = {}
-        if 'Solvents' in system_mixture_data.keys():
-            self._solvents = system_mixture_data['Solvents']
-        else:
-            self._solvents = {}
+            else:
+                self._solutes = {}
+            if 'Solvents' in system_mixture_data.keys():
+                self._solvents = system_mixture_data['Solvents']
+            else:
+                self._solvents = {}
+        elif mixture_data_type == 'number of molecules':
+            self._number_of_molecules_data = True
+            self._n_mol_dict = system_mixture_data
         self.length = cube_length
         self._origin = origin
 
@@ -1580,15 +1596,18 @@ class LammpsDataWrapper:
         :return packmol_params: [list] Info about number of atoms and box coordinates for packmol in Dicts for each
             molecule.
         '''
-        # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
-        solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
-        solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
-        solute_list = [self._solutes[name] for name in solute_names]
-        solvent_list = [self._solvents[name] for name in solvent_names]
+        if self._concentration_data:
+            # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
+            solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
+            solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
+            solute_list = [self._solutes[name] for name in solute_names]
+            solvent_list = [self._solvents[name] for name in solvent_names]
 
-        # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
-        nmolecules_initial, nmolecules_final = Calc_Num_Mols(self.length,solute_list,solvent_list)
-        nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
+            # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
+            nmolecules_initial, nmolecules_final = Calc_Num_Mols(self.length,solute_list,solvent_list)
+            nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
+        elif self._number_of_molecules_data:
+            nmol_dict = self._n_mol_dict
 
         # # Create list of min and max xyz coords
         xyz_high = list(np.add(self._origin,self.length))
