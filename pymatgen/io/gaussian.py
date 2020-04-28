@@ -853,7 +853,7 @@ class GaussianOutput:
                             self.dieze_tag = params[3]
                             parse_stage = 1
                         else:
-                            routeline += line.strip()
+                            routeline += ' ' + line.strip()
                 elif parse_stage == 1:
                     if set(line.strip()) == {"-"} and self.title is None:
                         self.title = ""
@@ -1314,6 +1314,7 @@ class GaussianOutput:
 
         scan_patt = re.compile(r"^\sSummary of the potential surface scan:")
         optscan_patt = re.compile(r"^\sSummary of Optimized Potential Surface Scan")
+        conv_patt = re.compile(r"\s")
 
         # data dict return
         data = {"energies": list(), "coords": dict()}
