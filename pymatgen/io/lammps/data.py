@@ -1036,7 +1036,7 @@ class ForceField(MSONable):
     def _is_valid(self, df):
         return not pd.isnull(df).values.any()
 
-    def __init__(self, mass_info, nonbond_coeffs=None, topo_coeffs=None):
+    def __init__(self, mass_info, nonbond_coeffs=None, topo_coeffs=None, check_duplicates=True):
         """
 
         Args:
@@ -1079,6 +1079,7 @@ class ForceField(MSONable):
                 be defined MORE THAN ONCE with DIFFERENT coefficients.
 
         """
+        self._check_duplicates = check_duplicates
         def map_mass(v):
             return v.atomic_mass.real if isinstance(v, Element) else Element(v).atomic_mass.real \
                 if isinstance(v, str) else v
@@ -1151,20 +1152,30 @@ class ForceField(MSONable):
             distinct_types.append(d["types"])
             for k in class2_data.keys():
                 class2_data[k].append(d[k])
-        distinct_types = [set(itertools.
-                              chain(*[find_eq_types(t, kw)
-                                      for t in dt])) for dt in distinct_types]
-        type_counts = sum([len(dt) for dt in distinct_types])
-        type_union = set.union(*distinct_types)
-        assert len(type_union) == type_counts, "Duplicated items found " \
-                                               "under different coefficients in %s" % kw
+        if self._check_duplicates:
+            distinct_types = [set(itertools.
+                                  chain(*[find_eq_types(t, kw)
+                                          for t in dt])) for dt in distinct_types]
+            type_counts = sum([len(dt) for dt in distinct_types])
+            type_union = set.union(*distinct_types)
+            assert len(type_union) == type_counts, "Duplicated items found " \
+                                                   "under different coefficients in %s" % kw
+        else:
+            distinct_types = [list(itertools.
+                                  chain(*[find_eq_types(t, kw)
+                                          for t in dt])) for dt in distinct_types]
         atoms = set(np.ravel(list(itertools.chain(*distinct_types))))
         assert atoms.issubset(self.maps["Atoms"].keys()), \
             "Undefined atom type found in %s" % kw
         mapper = {}
-        for i, dt in enumerate(distinct_types):
-            for t in dt:
-                mapper[t] = i + 1
+        if self._check_duplicates:
+            for i, dt in enumerate(distinct_types):
+                for t in dt:
+                    mapper[t] = i + 1
+        else:
+            for i, dt in enumerate(distinct_types):
+                for t in dt:
+                    mapper[tuple(t)] = i + 1
 
         def process_data(data):
             df = pd.DataFrame(data)
@@ -1501,11 +1512,18 @@ class LammpsDataWrapper:
     Object for wrapping LammpsData object in pymatgen.io.lammps.data
     '''
 
-    def __init__(self,system_force_fields,system_mixture_data,cube_length,mixture_data_type='concentration',origin=[0.,0.,0.],
-                 seed=150,packmolrunner_inputs={'input_file':'pack.inp','tolerance':2.0,'filetype':'xyz',
-                           'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
-                           'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
-                           'site_property':None},length_increase=0.5):
+    def __init__(self,system_force_fields,
+                 system_mixture_data,
+                 cube_length,
+                 mixture_data_type='concentration',
+                 origin=[0.,0.,0.],
+                 seed=150,
+                 packmolrunner_inputs={'input_file':'pack.inp','tolerance':2.0,'filetype':'xyz',
+                                       'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
+                                       'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
+                                       'site_property':None},
+                 length_increase=0.5,
+                 check_ff_duplicates = True):
         '''
         Low level constructor designed to work with lists of dictionaries that should be able to be obtained from
             databases. Works for cubic boxes only using real coordinates.
@@ -1576,6 +1594,7 @@ class LammpsDataWrapper:
         self._packmolrunner_inputs = packmolrunner_inputs
 
         self._length_increase = length_increase
+        self._check_ff_duplicates = check_ff_duplicates
 
     @property
     def SortedNames(self):
@@ -1678,7 +1697,10 @@ class LammpsDataWrapper:
         if Improper_Param_List:
             System_Bonded_Params['Improper Coeffs'] = Improper_Param_List
         # System_Bonded_Params = {'Bond Coeffs':Bond_Param_List,'Angle Coeffs':Angle_Param_List,'Dihedral Coeffs':Dihedral_Param_List,'Improper Coeffs':Improper_Param_List}
-        System_Force_Field_Params = ForceField(Masses_Ordered_Dict.items(),Nonbonded_Param_List,System_Bonded_Params)
+        System_Force_Field_Params = ForceField(Masses_Ordered_Dict.items(),
+                                               Nonbonded_Param_List,
+                                               System_Bonded_Params,
+                                               check_duplicates=self._check_ff_duplicates)
         return System_Force_Field_Params
 
     def _run_packmol(self,verbose=False):
