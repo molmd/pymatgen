@@ -262,6 +262,8 @@ def parse_lammps_log(filename="log.lammps"):
         return df
 
     runs = []
+    if not ends:
+        ends = [len(lines) - 1]
     for b, e in zip(begins, ends):
         runs.append(_parse_thermo(lines[b + 1:e]))
     return runs

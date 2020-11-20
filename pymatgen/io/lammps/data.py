@@ -1462,12 +1462,12 @@ def split_by_mult_mol(Pkml_mols,Pkml_parms,Mix,Site_props=None):
         return Molecules
 
 
-def Calc_Num_Mols(box_length,solute_list,solvent_list):
+def Calc_Num_Mols(box_volume,solute_list,solvent_list):
     '''
     Calculates the number of molecules for each molecular species in the system. This is important to obtain the input
         information for the PackmolRunner class in pymatgen.io.lammps.utils. The desired output is the second element
         of the output tuple
-    :param box_length: [float] the length of the system box in angstroms. Assumes a cubic box
+    :param box_volume: [float] the volume of the system box in cubic angstroms. Intended to be obtained from LammpsBox.volume
     :param solute_list: [list] contains Dictionaries with the following as keys: ['Initial Molarity', 'Final Molarity',
         'Density', 'Molar Weight'] for each molecular species that is a solute (ie has a defined molarity). 'Initial Molarity'
         and 'Final Molarity' will be equal unless some of the solute is transformed into another molecular species upon mixing
@@ -1493,14 +1493,14 @@ def Calc_Num_Mols(box_length,solute_list,solvent_list):
     nmols_initial = volumes_initial.copy()
     nmols_final = volumes_initial.copy()
     for i, solute in enumerate(solute_list):
-        nmols_initial[i] = int(round(solute['Initial Molarity'] * avogadro * 10**3 * 10**-30 * box_length**3))
-        nmols_final[i] = int(round(solute['Final Molarity'] * avogadro * 10**3 * 10**-30 * box_length**3))
+        nmols_initial[i] = int(round(solute['Initial Molarity'] * avogadro * 10**3 * 10**-30 * box_volume))
+        nmols_final[i] = int(round(solute['Final Molarity'] * avogadro * 10**3 * 10**-30 * box_volume))
         volumes_initial[i] = nmols_initial[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
         volumes_final[i] = nmols_final[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
     if solute_list:
-        volumes_initial[-1] = box_length**3 - np.sum(volumes_initial)
+        volumes_initial[-1] = box_volume - np.sum(volumes_initial)
     else:
-        volumes_initial[0] = box_length**3
+        volumes_initial[0] = box_volume
     extra_solvent = np.sum(np.subtract(nmols_initial,nmols_final))
     # assert extra_solvent >= 0
     if solute_list:
@@ -1519,7 +1519,7 @@ class LammpsDataWrapper:
 
     def __init__(self,system_force_fields,
                  system_mixture_data,
-                 cube_length,
+                 box_data,
                  mixture_data_type='concentration',
                  origin=[0.,0.,0.],
                  seed=150,
@@ -1527,8 +1527,9 @@ class LammpsDataWrapper:
                                        'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
                                        'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
                                        'site_property':None},
-                 length_increase=0.5,
-                 check_ff_duplicates = True):
+                 length_increase=0.0,
+                 check_ff_duplicates = True,
+                 box_data_type = "cubic"):
         '''
         Low level constructor designed to work with lists of dictionaries that should be able to be obtained from
             databases. Works for cubic boxes only using real coordinates.
@@ -1578,6 +1579,7 @@ class LammpsDataWrapper:
         self._ff_list = system_force_fields
         self._concentration_data = False
         self._number_of_molecules_data = False
+
         if mixture_data_type == 'concentration':
             self._concentration_data = True
             if 'Solutes' in system_mixture_data.keys():
@@ -1592,7 +1594,16 @@ class LammpsDataWrapper:
         elif mixture_data_type == 'number of molecules':
             self._number_of_molecules_data = True
             self._n_mol_dict = system_mixture_data
-        self.length = cube_length
+
+        if box_data_type == "cubic":
+            self.length = box_data
+            self._initial_lammps_box = LammpsBox([[0.0, box_data],
+                                                  [0.0, box_data],
+                                                  [0.0, box_data]])
+        elif box_data_type == "rectangular":
+            self._initial_lammps_box = LammpsBox(box_data)
+        elif box_data_type == "LammpsBox":
+            self._initial_lammps_box = box_data
         self._origin = origin
 
         packmolrunner_inputs['control_params']['seed'] = seed
@@ -1628,14 +1639,15 @@ class LammpsDataWrapper:
             solvent_list = [self._solvents[name] for name in solvent_names]
 
             # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
-            nmolecules_initial, nmolecules_final = Calc_Num_Mols(self.length,solute_list,solvent_list)
+            nmolecules_initial, nmolecules_final = Calc_Num_Mols(self._initial_lammps_box.volume,solute_list,solvent_list)
             nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
         elif self._number_of_molecules_data:
             nmol_dict = self._n_mol_dict
 
         # # Create list of min and max xyz coords
-        xyz_high = list(np.add(self._origin,self.length))
-        box_xyz = self._origin + xyz_high
+        self.xyz_low = [bound[0] for bound in self._initial_lammps_box.as_dict()['bounds']]
+        self.xyz_high = [bound[1] for bound in self._initial_lammps_box.as_dict()['bounds']]
+        box_xyz = self.xyz_low + self.xyz_high
 
         # # make packmol input list preserving the order of SortedNames
         packmol_params = [{'number': int(nmol_dict[name]), 'inside box': box_xyz} for name in self.SortedNames]
@@ -1728,8 +1740,9 @@ class LammpsDataWrapper:
 
         if verbose:
             print('Running Packmol:')
-        System_molecule_obj = Packmol_runner_obj.run(copy_to_current_on_exit=self._packmolrunner_inputs['copy_to_current_on_exit'],
-                                                     site_property=self._packmolrunner_inputs['site_property'])
+#        System_molecule_obj = Packmol_runner_obj.run(copy_to_current_on_exit=self._packmolrunner_inputs['copy_to_current_on_exit'],
+#                                                     site_property=self._packmolrunner_inputs['site_property'])
+        System_molecule_obj = Packmol_runner_obj.run(site_property=self._packmolrunner_inputs['site_property'])
         if verbose:
             print('Packmol finished!')
         return System_molecule_obj
@@ -1767,9 +1780,14 @@ class LammpsDataWrapper:
         :param System_molecule: [Molecule] Output from _run_packmol()
         :return Mix_lmpbox: [pmg.LammpsBox] Object representing the simulation box
         '''
-        lattice_length = self.length + self._length_increase
-        Mix_lattice = System_molecule.get_boxed_structure(lattice_length,lattice_length,lattice_length).lattice
-        Mix_lmpbox, Mix_symopp = lattice_2_lmpbox(Mix_lattice)
+        final_xyz_low = np.subtract(self.xyz_low,np.ones(3) * self._length_increase * 0.5)
+        final_xyz_high = np.add(self.xyz_high,np.ones(3) * self._length_increase * 0.5)
+        final_bounds = np.asarray([final_xyz_low, final_xyz_high]).transpose()
+
+        Mix_lmpbox = LammpsBox(final_bounds, self._initial_lammps_box.as_dict()['tilt'])
+
+        # Mix_lattice = System_molecule.get_boxed_structure(lattice_length,lattice_length,lattice_length).lattice
+        # Mix_lmpbox, Mix_symopp = lattice_2_lmpbox(Mix_lattice)
         return Mix_lmpbox
 
     def MakeLammpsData(self,atom_style='full'):

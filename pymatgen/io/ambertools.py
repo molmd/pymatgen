@@ -430,7 +430,10 @@ class PrmtopParser:
         '''
         Masses_ordered_dict = OrderedDict()
         for type in self.LabelTypeList:
-            Masses_ordered_dict[type] = float(Gaff_dict[type[:-len(self._mol_name)].lower()])
+            if self._mol_name:
+                Masses_ordered_dict[type] = float(Gaff_dict[type[:-len(self._mol_name)].lower()])
+            else:
+                Masses_ordered_dict[type] = float(Gaff_dict[type.lower()])
         return Masses_ordered_dict
 
 
@@ -442,7 +445,10 @@ class PrmtopParser:
         '''
         LJ_param_list = []
         for type in self.LabelTypeList:
-            index = self._amberparm.LJ_types[type[:-len(self._mol_name)]] - 1
+            if self._mol_name:
+                index = self._amberparm.LJ_types[type[:-len(self._mol_name)]] - 1
+            else:
+                index = self._amberparm.LJ_types[type] - 1
             LJ_param_list.append([self._amberparm.LJ_depth[index],self._amberparm.LJ_radius[index] * 2 ** (5/6)])
         return LJ_param_list
 
