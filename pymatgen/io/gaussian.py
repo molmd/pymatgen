@@ -855,6 +855,9 @@ class GaussianOutput:
         tensor_eigen_patt = re.compile(r'^\s+Eigenvalues:\s+(\d+.?\d*)\s+(\d+.?\d*)\s+(\d+.?\d*)')
         end_tensor_patt = re.compile(r'^\s*(End of Minotr F.D. properties file)\s+(\d+)\s*(does not exist.)')
 
+        dipole_header_patt = re.compile(r"^\s*(Dipole moment)\s\((.+)\):")
+        tot_dipole_patt = re.compile(r"^\s+([A-Z])=\s+(-?\d+.?\d*)\s+([A-Z])=\s+(-?\d+.?\d*)\s+([A-Z])=\s+(-?\d+.?\d*)\s+([A-Z][a-z]+)=\s+(-?\d+.?\d*)")
+
         self.properly_terminated = False
         self.is_pcm = False
         self.stationary_type = "Minimum"
@@ -874,6 +877,7 @@ class GaussianOutput:
         self.bond_orders = {}
         self.esp_charges = {}
         self.tensor = {}
+        self.dipole = {}
 
         read_coord = 0
         read_mulliken = False
@@ -896,6 +900,7 @@ class GaussianOutput:
         geom_orientation = None
         read_esp = False
         read_tensor = False
+        read_dipole = False
 
         with zopen(filename) as f:
             for line in f:
@@ -1198,6 +1203,9 @@ class GaussianOutput:
                     elif tensor_header_patt.search(line):
                         tensor_txt = []
                         read_tensor = True
+                    elif dipole_header_patt.search(line):
+                        dipole_txt = []
+                        read_dipole = True
                     elif not parse_forces and forces_on_patt.search(line):
                         parse_forces = True
                     elif freq_on_patt.search(line):
@@ -1277,8 +1285,15 @@ class GaussianOutput:
                             read_tensor = False
                             self.tensor = tensor
 
-        # store the structures. If symmetry is considered, the standard orientation
-        # is used. Else the input orientation is used.
+                    if read_dipole:
+                        if tot_dipole_patt.search(line):
+                            d = tot_dipole_patt.search(line)
+                            dipole_dict = {d.group(i): float(d.group(i + 1)) for i in range(1, 8, 2)}
+                            read_esp = False
+                            self.dipole = dipole_dict
+
+        # store the structures. If symmetry is considered, the standard
+        # orientation is used. Else the input orientation is used.
         if standard_orientation:
             self.structures = std_structures
             self.structures_input_orientation = input_structures
@@ -1327,6 +1342,8 @@ class GaussianOutput:
             d["ESP_charges"] = self.esp_charges
         if self.tensor:
             d["tensor"] = self.tensor
+        if self.dipole:
+            d["dipole_moment"] = self.dipole
 
         unique_symbols = sorted(list(d["unit_cell_formula"].keys()))
         d["elements"] = unique_symbols
@@ -1356,6 +1373,8 @@ class GaussianOutput:
             vout["ESP_charges"] = self.esp_charges
         if self.tensor:
             vout["tensor"] = self.tensor
+        if self.dipole:
+            vout["dipole_moment"] = self.dipole
 
         d['output'] = vout
         d["@module"] = self.__class__.__module__
