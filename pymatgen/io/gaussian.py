@@ -387,6 +387,8 @@ class GaussianInput:
                 spaces += 1
             if spaces >= 1:
                 d = lines[i].split("=")
+                if len(d) == 1 and d[0] != '':
+                    input_paras[d[0]] = None
                 if len(d) == 2:
                     input_paras[d[0]] = d[1]
             else:
