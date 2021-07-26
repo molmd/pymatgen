@@ -108,10 +108,10 @@ def read_route_line(route):
             basis_set = _replace_parenthesis(basis_set, parenthesis_list)
         for tok in route.split():
             tok = _replace_parenthesis(tok, parenthesis_list)
-            if scrf_patt.match(tok):
-                m = scrf_patt.match(tok)
-                route_params[m.group(1)] = m.group(2)
-            elif tok.upper() in ["#", "#N", "#P", "#T"]:
+            # if scrf_patt.match(tok):
+            #     m = scrf_patt.match(tok)
+            #     route_params[m.group(1)] = m.group(2)
+            if tok.upper() in ["#", "#N", "#P", "#T"]:
                 # does not store # in route to avoid error in input
                 if tok == "#":
                     dieze_tag = "#N"
