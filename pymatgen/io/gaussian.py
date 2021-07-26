@@ -851,10 +851,10 @@ class GaussianOutput:
             r'(Sum of ESP )(.*)(charges)\s*=\s*(\D)')
         tensor_header_patt = re.compile(r"SCF GIAO Magnetic shielding tensor \(ppm\):")
         tensor_patt = \
-            re.compile(r'^\s+(\d+)\s+([A-Z][a-z]?)\s*(Isotropic)\s*=\s+(\d+.?\d*)\s*(Anisotropy)\s*=\s*(\d+.?\d*)')
+            re.compile(r'^\s+(\d+)\s+([A-Z][a-z]?)\s*(Isotropic)\s*=\s+(-?\d+.?\d*)\s*(Anisotropy)\s*=\s*(-?\d+.?\d*)')
         tensor_mat_patt = \
-            re.compile(r'^\s+[A-Z][A-Z]=\s+(\d+.?\d*)\s+[A-Z][A-Z]=\s+(\d+.?\d*)\s+[A-Z][A-Z]=\s+(\d+.?\d*)')
-        tensor_eigen_patt = re.compile(r'^\s+Eigenvalues:\s+(\d+.?\d*)\s+(\d+.?\d*)\s+(\d+.?\d*)')
+            re.compile(r'^\s+[A-Z][A-Z]=\s+(-?\d+.?\d*)\s+[A-Z][A-Z]=\s+(-?\d+.?\d*)\s+[A-Z][A-Z]=\s+(-?\d+.?\d*)')
+        tensor_eigen_patt = re.compile(r'^\s+Eigenvalues:\s+(-?\d+.?\d*)\s+(-?\d+.?\d*)\s+(-?\d+.?\d*)')
         end_tensor_patt = re.compile(r'^\s*(End of Minotr F.D. properties file)\s+(\d+)\s*(does not exist.)')
 
         dipole_header_patt = re.compile(r"^\s*(Dipole moment)\s\((.+)\):")
@@ -1286,7 +1286,6 @@ class GaussianOutput:
                                     tensor[latest_key]['eigenvalues'] = eigen_list
                             read_tensor = False
                             self.tensor = tensor
-
                     if read_dipole:
                         if tot_dipole_patt.search(line):
                             d = tot_dipole_patt.search(line)
