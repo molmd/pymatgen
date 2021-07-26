@@ -859,6 +859,8 @@ class GaussianOutput:
 
         dipole_header_patt = re.compile(r"^\s*(Dipole moment)\s\((.+)\):")
         tot_dipole_patt = re.compile(r"^\s+([A-Z])=\s+(-?\d+.?\d*)\s+([A-Z])=\s+(-?\d+.?\d*)\s+([A-Z])=\s+(-?\d+.?\d*)\s+([A-Z][a-z]+)=\s+(-?\d+.?\d*)")
+        polarizability_patt = re.compile(r"^\s*Isotropic polarizability for W=\s+(-?\d+.?\d*)\s+(-?\d+.?\d*)\s+Bohr..3.")
+        version_patt = re.compile(r"^\sGaussian\s([0-9]*):\s+([a-zA-Z0-9_.-]*).*")
 
         self.properly_terminated = False
         self.is_pcm = False
@@ -880,6 +882,8 @@ class GaussianOutput:
         self.esp_charges = {}
         self.tensor = {}
         self.dipole = {}
+        self.polarizability = None
+        self.version = None
 
         read_coord = 0
         read_mulliken = False
@@ -925,6 +929,9 @@ class GaussianOutput:
                             parse_stage = 1
                         else:
                             routeline += line.strip()
+                    elif version_patt.search(line):
+                        v = version_patt.search(line)
+                        self.version = str(v.group(2))
                 elif parse_stage == 1:
                     if set(line.strip()) == {"-"} and self.title is None:
                         self.title = ""
@@ -936,7 +943,6 @@ class GaussianOutput:
                         self.spin_multiplicity = int(m.group(2))
                         parse_stage = 2
                 elif parse_stage == 2:
-
                     if self.is_pcm:
                         self._check_pcm(line)
 
@@ -1206,8 +1212,10 @@ class GaussianOutput:
                         tensor_txt = []
                         read_tensor = True
                     elif dipole_header_patt.search(line):
-                        dipole_txt = []
                         read_dipole = True
+                    elif polarizability_patt.search(line):
+                        m = polarizability_patt.search(line)
+                        self.polarizability = float(m.group(2))
                     elif not parse_forces and forces_on_patt.search(line):
                         parse_forces = True
                     elif freq_on_patt.search(line):
@@ -1339,12 +1347,6 @@ class GaussianOutput:
         d["is_pcm"] = self.is_pcm
         d["errors"] = self.errors
         d["Mulliken_charges"] = self.Mulliken_charges
-        if self.esp_charges:
-            d["ESP_charges"] = self.esp_charges
-        if self.tensor:
-            d["tensor"] = self.tensor
-        if self.dipole:
-            d["dipole_moment"] = self.dipole
 
         unique_symbols = sorted(list(d["unit_cell_formula"].keys()))
         d["elements"] = unique_symbols
@@ -1376,6 +1378,10 @@ class GaussianOutput:
             vout["tensor"] = self.tensor
         if self.dipole:
             vout["dipole_moment"] = self.dipole
+        if self.polarizability:
+            vout["polarizability"] = self.polarizability
+        if self.version:
+            vout["gauss_version"] = self.version
 
         d['output'] = vout
         d["@module"] = self.__class__.__module__
