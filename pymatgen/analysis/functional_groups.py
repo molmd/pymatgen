@@ -2,6 +2,11 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
+"""
+Determine functional groups present in a Molecule.
+"""
+
+
 import copy
 
 from pymatgen.core.structure import Molecule
@@ -92,9 +97,7 @@ class FunctionalGroupExtractor:
 
         if self.molgraph is None:
             self.molgraph = MoleculeGraph.with_local_env_strategy(self.molecule,
-                                                                  OpenBabelNN(),
-                                                                  reorder=False,
-                                                                  extend_structure=False)
+                                                                  OpenBabelNN())
 
         # Assign a specie and coordinates to each node in the graph,
         # corresponding to the Site in the Molecule object
@@ -217,10 +220,8 @@ class FunctionalGroupExtractor:
         # Graph representation of only marked atoms
         subgraph = self.molgraph.graph.subgraph(list(atoms)).to_undirected()
 
-        func_grps_no_h = [x for x in nx.connected_components(subgraph)]
-
         func_grps = []
-        for func_grp in func_grps_no_h:
+        for func_grp in nx.connected_components(subgraph):
             grp_hs = set()
             for node in func_grp:
                 neighbors = self.molgraph.graph[node]

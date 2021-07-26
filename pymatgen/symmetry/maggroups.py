@@ -7,19 +7,19 @@ Magnetic space groups.
 """
 
 import os
+import sqlite3
+import textwrap
+from array import array
 from fractions import Fraction
+
 import numpy as np
 from monty.design_patterns import cached_class
 
-import textwrap
-
+from pymatgen.core.operations import MagSymmOp
 from pymatgen.electronic_structure.core import Magmom
 from pymatgen.symmetry.groups import SymmetryGroup, in_array_list
-from pymatgen.core.operations import MagSymmOp
+from pymatgen.symmetry.settings import JonesFaithfulTransformation
 from pymatgen.util.string import transformation_to_string
-
-import sqlite3
-from array import array
 
 __author__ = "Matthew Horton, Shyue Ping Ong"
 __copyright__ = "Copyright 2017, The Materials Project"
@@ -37,7 +37,7 @@ class MagneticSpaceGroup(SymmetryGroup):
     """
     Representation of a magnetic space group.
     """
-    def __init__(self, id):
+    def __init__(self, id, setting_transformation="a,b,c;0,0,0"):
         """
         Initializes a MagneticSpaceGroup from its Belov, Neronova and
         Smirnova (BNS) number supplied as a list or its label supplied
@@ -121,6 +121,15 @@ class MagneticSpaceGroup(SymmetryGroup):
             c.execute('SELECT * FROM space_groups WHERE OG3=?;', (id,))
         raw_data = list(c.fetchone())
 
+        # Jones Faithful transformation
+        self.jf = JonesFaithfulTransformation.from_transformation_string("a,b,c;0,0,0")
+        if isinstance(setting_transformation, str):
+            if setting_transformation != "a,b,c;0,0,0":
+                self.jf = JonesFaithfulTransformation.from_transformation_string(setting_transformation)
+        elif isinstance(setting_transformation, JonesFaithfulTransformation):
+            if setting_transformation != self.jf:
+                self.jf = setting_transformation
+
         self._data['magtype'] = raw_data[0]  # int from 1 to 4
         self._data['bns_number'] = [raw_data[1], raw_data[2]]
         self._data['bns_label'] = raw_data[3]
@@ -171,8 +180,7 @@ class MagneticSpaceGroup(SymmetryGroup):
             def get_label(idx):
                 if idx <= 25:
                     return chr(97 + idx)  # returns a-z when idx 0-25
-                else:
-                    return 'alpha'  # when a-z labels exhausted, use alpha, only relevant for a few space groups
+                return 'alpha'  # when a-z labels exhausted, use alpha, only relevant for a few space groups
 
             o = 0  # offset
             n = 1  # nth Wyckoff site
@@ -289,18 +297,17 @@ class MagneticSpaceGroup(SymmetryGroup):
         i = self._data["bns_number"][0]
         if i <= 2:
             return "triclinic"
-        elif i <= 15:
+        if i <= 15:
             return "monoclinic"
-        elif i <= 74:
+        if i <= 74:
             return "orthorhombic"
-        elif i <= 142:
+        if i <= 142:
             return "tetragonal"
-        elif i <= 167:
+        if i <= 167:
             return "trigonal"
-        elif i <= 194:
+        if i <= 194:
             return "hexagonal"
-        else:
-            return "cubic"
+        return "cubic"
 
     @property
     def sg_symbol(self):
@@ -333,6 +340,9 @@ class MagneticSpaceGroup(SymmetryGroup):
                     centered_ops.append(new_op)
 
         ops = ops + centered_ops
+
+        # apply jones faithful transformation
+        ops = [self.jf.transform_symmop(op) for op in ops]
 
         return ops
 
@@ -386,19 +396,18 @@ class MagneticSpaceGroup(SymmetryGroup):
         if crys_system == "cubic":
             a = abc[0]
             return check(abc, [a, a, a], tol) and check(angles, [90, 90, 90], angle_tol)
-        elif crys_system == "hexagonal" or (crys_system == "trigonal" and
-                                            self.symbol.endswith("H")):
+        if crys_system == "hexagonal" or (crys_system == "trigonal" and self.sg_symbol.endswith("H")):
             a = abc[0]
             return check(abc, [a, a, None], tol) and check(angles, [90, 90, 120], angle_tol)
-        elif crys_system == "trigonal":
+        if crys_system == "trigonal":
             a = abc[0]
             return check(abc, [a, a, a], tol)
-        elif crys_system == "tetragonal":
+        if crys_system == "tetragonal":
             a = abc[0]
             return check(abc, [a, a, None], tol) and check(angles, [90, 90, 90], angle_tol)
-        elif crys_system == "orthorhombic":
+        if crys_system == "orthorhombic":
             return check(angles, [90, 90, 90], angle_tol)
-        elif crys_system == "monoclinic":
+        if crys_system == "monoclinic":
             return check(angles, [90, None, 90], angle_tol)
         return True
 
@@ -413,8 +422,15 @@ class MagneticSpaceGroup(SymmetryGroup):
         # all stored data including OG setting
 
         desc = {}  # dictionary to hold description strings
+        description = ""
 
         # parse data into strings
+
+        # indicate if non-standard setting specified
+        if self.jf != JonesFaithfulTransformation.from_transformation_string("a,b,c;0,0,0"):
+            description += "Non-standard setting: .....\n"
+            description += self.jf.__repr__()
+            description += "\n\nStandard setting information: \n"
 
         desc['magtype'] = self._data['magtype']
         desc['bns_number'] = ".".join(map(str, self._data["bns_number"]))
@@ -444,11 +460,11 @@ class MagneticSpaceGroup(SymmetryGroup):
                                               subsequent_indent=" " * len(bns_operators_prefix),
                                               break_long_words=False, break_on_hyphens=False)
 
-        description = ("BNS: {d[bns_number]} {d[bns_label]}{d[og_id]}\n"
-                       "{d[og_bns_transformation]}"
-                       "{d[bns_operators]}\n"
-                       "{bns_wyckoff_prefix}{d[bns_lattice]}\n"
-                       "{d[bns_wyckoff]}").format(d=desc, bns_wyckoff_prefix=bns_wyckoff_prefix)
+        description += ("BNS: {d[bns_number]} {d[bns_label]}{d[og_id]}\n"
+                        "{d[og_bns_transformation]}"
+                        "{d[bns_operators]}\n"
+                        "{bns_wyckoff_prefix}{d[bns_lattice]}\n"
+                        "{d[bns_wyckoff]}").format(d=desc, bns_wyckoff_prefix=bns_wyckoff_prefix)
 
         if desc['magtype'] == 4 and include_og:
 

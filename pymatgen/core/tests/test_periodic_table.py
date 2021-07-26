@@ -63,10 +63,13 @@ class ElementTestCase(PymatgenTest):
         for k, v in testsets.items():
             self.assertEqual(Element(k).full_electronic_structure, v)
 
+        self.assertEqual(Element.Ac.electronic_structure, '[Rn].6d1.7s2')
+
     def test_valence(self):
         testsets = {"O": (1, 4),
                     "Fe": (2, 6),
-                    "Li": (0, 1)}
+                    "Li": (0, 1),
+                    "Be": (0, 2)}
         for k, v in testsets.items():
             self.assertEqual(Element(k).valence, v)
 
@@ -350,6 +353,9 @@ class SpecieTestCase(PymatgenTest):
         self.assertEqual(str(mo0), "Mo0+,spin=5")
         mo = Specie.from_string("Mo0+,spin=4")
         self.assertEqual(mo.spin, 4)
+        fe_no_ox = Specie("Fe", oxidation_state=None, properties={"spin": 5})
+        fe_no_ox_from_str = Specie.from_string("Fe,spin=5")
+        self.assertEqual(fe_no_ox, fe_no_ox_from_str)
 
     def test_no_oxidation_state(self):
         mo0 = Specie("Mo", None, {"spin": 5})

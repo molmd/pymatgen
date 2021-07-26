@@ -27,10 +27,10 @@ import copy
 
 from monty.json import MSONable
 from monty.dev import requires
-from pymatgen.io.babel import BabelMolAdaptor
 
 try:
-    import openbabel as ob
+    from openbabel import openbabel as ob
+    from pymatgen.io.babel import BabelMolAdaptor
 except ImportError:
     ob = None
 
@@ -78,6 +78,13 @@ class AbstractMolAtomMapper(MSONable, metaclass=abc.ABCMeta):
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Args:
+            d (): Dict
+
+        Returns:
+            AbstractMolAtomMapper
+        """
         for trans_modules in ['molecule_matcher']:
             import sys
             if sys.version_info > (3, 0):
@@ -171,33 +178,56 @@ class IsomorphismMolAtomMapper(AbstractMolAtomMapper):
         return match.group("inchi")
 
     def as_dict(self):
+        """
+        Returns:
+            Jsonable dict.
+        """
         return {"version": __version__, "@module": self.__class__.__module__,
                 "@class": self.__class__.__name__}
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Args:
+            d (dict): Dict representation
+
+        Returns:
+            IsomorphismMolAtomMapper
+        """
         return IsomorphismMolAtomMapper()
 
 
 class InchiMolAtomMapper(AbstractMolAtomMapper):
     """
     Pair atoms by inchi labels.
-
-    Args:
-        angle_tolerance: Angle threshold to assume linear molecule. In degrees.
     """
 
     def __init__(self, angle_tolerance=10.0):
+        """
+        Args:
+            angle_tolerance (float): Angle threshold to assume linear molecule. In degrees.
+        """
         self._angle_tolerance = angle_tolerance
         self._assistant_mapper = IsomorphismMolAtomMapper()
 
     def as_dict(self):
+        """
+        Returns:
+            MSONAble dict.
+        """
         return {"version": __version__, "@module": self.__class__.__module__,
                 "@class": self.__class__.__name__,
                 "angle_tolerance": self._angle_tolerance}
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Args:
+            d (dict): Dict Representation
+
+        Returns:
+            InchiMolAtomMapper
+        """
         return InchiMolAtomMapper(angle_tolerance=d["angle_tolerance"])
 
     @staticmethod
@@ -276,7 +306,7 @@ class InchiMolAtomMapper(AbstractMolAtomMapper):
         """
         vmol = ob.OBMol()
 
-        non_unique_atoms = set([a for g in eq_atoms for a in g])
+        non_unique_atoms = {a for g in eq_atoms for a in g}
         all_atoms = set(range(1, len(ilabels) + 1))
         unique_atom_labels = sorted(all_atoms - non_unique_atoms)
 
@@ -382,10 +412,7 @@ class InchiMolAtomMapper(AbstractMolAtomMapper):
                 canon_label2[c2 - 1] = canon_idx
                 candidates1.remove(canon_idx)
 
-        canon_inchi_orig_map2 = [(canon, inchi, orig)
-                                 for canon, inchi, orig in
-                                 zip(canon_label2, list(range(1, nheavy + 1)),
-                                     ilabel2)]
+        canon_inchi_orig_map2 = list(zip(canon_label2, list(range(1, nheavy + 1)), ilabel2))
         canon_inchi_orig_map2.sort(key=lambda m: m[0])
         heavy_atom_indices2 = tuple([x[2] for x in canon_inchi_orig_map2])
         return heavy_atom_indices2
@@ -448,9 +475,7 @@ class InchiMolAtomMapper(AbstractMolAtomMapper):
             hydrogen_label1.remove(idx)
 
         hydrogen_orig_idx2 = label2[len(heavy_indices2):]
-        hydrogen_canon_orig_map2 = [(canon, orig) for canon, orig
-                                    in zip(hydrogen_label2,
-                                           hydrogen_orig_idx2)]
+        hydrogen_canon_orig_map2 = list(zip(hydrogen_label2, hydrogen_orig_idx2))
         hydrogen_canon_orig_map2.sort(key=lambda m: m[0])
         hydrogen_canon_indices2 = [x[1] for x in hydrogen_canon_orig_map2]
 
@@ -499,6 +524,14 @@ class InchiMolAtomMapper(AbstractMolAtomMapper):
         return True
 
     def uniform_labels(self, mol1, mol2):
+        """
+        Args:
+            mol1 (Molecule): Molecule 1
+            mol2 (Molecule): Molecule 2
+
+        Returns:
+            Labels
+        """
         obmol1 = BabelMolAdaptor(mol1).openbabel_mol
         obmol2 = BabelMolAdaptor(mol2).openbabel_mol
 
@@ -549,18 +582,20 @@ class InchiMolAtomMapper(AbstractMolAtomMapper):
 class MoleculeMatcher(MSONable):
     """
     Class to match molecules and identify whether molecules are the same.
-
-    Args:
-        tolerance: RMSD difference threshold whether two molecules are
-            different
-        mapper: MolAtomMapper object that is able to map the atoms of two
-            molecule to uniform order
     """
 
     @requires(ob,
               "BabelMolAdaptor requires openbabel to be installed with "
-              "Python bindings. Please get it at http://openbabel.org.")
+              "Python bindings. Please get it at http://openbabel.org "
+              "(version >=3.0.0).")
     def __init__(self, tolerance=0.01, mapper=InchiMolAtomMapper()):
+        """
+        Args:
+            tolerance (float): RMSD difference threshold whether two molecules are
+                different
+            mapper (AbstractMolAtomMapper): MolAtomMapper object that is able to map the atoms of two
+                molecule to uniform order
+        """
         self._tolerance = tolerance
         self._mapper = mapper
 
@@ -656,16 +691,14 @@ class MoleculeMatcher(MSONable):
             mol_eq_test = [(p[0], p[1], self.fit(mol_list[p[0]],
                                                  mol_list[p[1]]))
                            for p in itertools.combinations(sorted(rg), 2)]
-            mol_eq = set([(p[0], p[1]) for p in mol_eq_test if p[2]])
+            mol_eq = {(p[0], p[1]) for p in mol_eq_test if p[2]}
             not_alone_mols = set(itertools.chain.from_iterable(mol_eq))
             alone_mols = set(rg) - not_alone_mols
             group_indices.extend([[m] for m in alone_mols])
             while len(not_alone_mols) > 0:
                 current_group = {not_alone_mols.pop()}
                 while len(not_alone_mols) > 0:
-                    candidate_pairs = set(
-                        [tuple(sorted(p)) for p
-                         in itertools.product(current_group, not_alone_mols)])
+                    candidate_pairs = {tuple(sorted(p)) for p in itertools.product(current_group, not_alone_mols)}
                     mutual_pairs = candidate_pairs & mol_eq
                     if len(mutual_pairs) == 0:
                         break
@@ -680,12 +713,23 @@ class MoleculeMatcher(MSONable):
         return all_groups
 
     def as_dict(self):
+        """
+        Returns:
+            MSONAble dict.
+        """
         return {"version": __version__, "@module": self.__class__.__module__,
                 "@class": self.__class__.__name__,
                 "tolerance": self._tolerance, "mapper": self._mapper.as_dict()}
 
     @classmethod
     def from_dict(cls, d):
+        """
+        Args:
+            d (dict): Dict representation
+
+        Returns:
+            MoleculeMatcher
+        """
         return MoleculeMatcher(
             tolerance=d["tolerance"],
             mapper=AbstractMolAtomMapper.from_dict(d["mapper"]))

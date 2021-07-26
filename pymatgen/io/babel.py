@@ -2,26 +2,26 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
-
-import warnings
-import copy
-from pymatgen.core.structure import Molecule
-from pymatgen.analysis.graphs import MoleculeGraph
-from monty.dev import requires
-
-try:
-    import openbabel as ob
-    import pybel as pb
-except Exception:
-    pb = None
-    ob = None
-
 """
 OpenBabel interface module, which opens up access to the hundreds of file
 formats supported by OpenBabel. Requires openbabel with python bindings to be
 installed. Please consult the
 `openbabel documentation <http://openbabel.org/wiki/Main_Page>`_.
 """
+
+import warnings
+import copy
+
+from monty.dev import requires
+
+from pymatgen.core.structure import Molecule, IMolecule
+
+try:
+    from openbabel import openbabel as ob
+    from openbabel import pybel as pb
+except Exception:
+    ob = None
+
 
 __author__ = "Shyue Ping Ong, Qi Wang"
 __copyright__ = "Copyright 2012, The Materials Project"
@@ -37,17 +37,18 @@ class BabelMolAdaptor:
     Molecule.
     """
 
-    @requires(pb and ob,
+    @requires(ob,
               "BabelMolAdaptor requires openbabel to be installed with "
-              "Python bindings. Please get it at http://openbabel.org.")
+              "Python bindings. Please get it at http://openbabel.org "
+              "(version >=3.0.0).")
     def __init__(self, mol):
         """
         Initializes with pymatgen Molecule or OpenBabel"s OBMol.
 
         Args:
-            mol: pymatgen's Molecule or OpenBabel OBMol
+            mol: pymatgen's Molecule/IMolecule or OpenBabel OBMol
         """
-        if isinstance(mol, Molecule):
+        if isinstance(mol, IMolecule):
             if not mol.is_ordered:
                 raise ValueError("OpenBabel Molecule only supports ordered "
                                  "molecules.")
@@ -59,7 +60,7 @@ class BabelMolAdaptor:
             obmol = ob.OBMol()
             obmol.BeginModify()
             for site in mol:
-                coords = [c for c in site.coords]
+                coords = list(site.coords)
                 atomno = site.specie.Z
                 obatom = ob.OBAtom()
                 obatom.thisown = 0
@@ -72,7 +73,6 @@ class BabelMolAdaptor:
             obmol.SetTotalSpinMultiplicity(mol.spin_multiplicity)
             obmol.SetTotalCharge(int(mol.charge))
             obmol.Center()
-            obmol.Kekulize()
             obmol.EndModify()
             self._obmol = obmol
         elif isinstance(mol, ob.OBMol):
@@ -319,8 +319,8 @@ class BabelMolAdaptor:
         mols = pb.readfile(str(file_format), str(filename))
         if return_all_molecules:
             return [BabelMolAdaptor(mol.OBMol) for mol in mols]
-        else:
-            return BabelMolAdaptor(next(mols).OBMol)
+
+        return BabelMolAdaptor(next(mols).OBMol)
 
     @staticmethod
     def from_molecule_graph(mol):
@@ -333,8 +333,7 @@ class BabelMolAdaptor:
         Returns:
             BabelMolAdaptor object
         """
-        if isinstance(mol, MoleculeGraph):
-            return BabelMolAdaptor(mol.molecule)
+        return BabelMolAdaptor(mol.molecule)
 
     @staticmethod
     def from_string(string_data, file_format="xyz"):

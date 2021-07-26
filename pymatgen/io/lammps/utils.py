@@ -15,17 +15,18 @@ from subprocess import Popen, PIPE
 import numpy as np
 
 try:
-    import pybel as pb
+    from openbabel import pybel as pb
 except ImportError:
     pb = None
+
+from monty.os.path import which
+from monty.tempfile import ScratchDir
 
 from pymatgen import Molecule
 from pymatgen.core.operations import SymmOp
 from pymatgen.util.coord import get_angle
 from pymatgen.io.babel import BabelMolAdaptor
 
-from monty.os.path import which
-from monty.tempfile import ScratchDir
 
 __author__ = 'Kiran Mathew, Brandon Wood, Michael Humbert'
 __email__ = 'kmathew@lbl.gov'
@@ -222,21 +223,21 @@ class PackmolRunner:
             self._set_box()
         self.encode = encode
 
-    def _format_param_val(self, param_val):
+    @staticmethod
+    def _format_param_val(param_val):
         """
         Internal method to format values in the packmol parameter dictionaries
 
         Args:
-              param_val:
-                   Some object to turn into String
+            param_val:
+                Some object to turn into String
 
         Returns:
-               string representation of the object
+            String representation of the object
         """
         if isinstance(param_val, list):
             return ' '.join(str(x) for x in param_val)
-        else:
-            return str(param_val)
+        return str(param_val)
 
     def _set_box(self):
         """
@@ -293,28 +294,24 @@ class PackmolRunner:
                     inp.write('  {} {}\n'.format(k, self._format_param_val(v)))
                 inp.write('end structure\n')
 
-    def run(self, copy_to_current_on_exit=False, site_property=None):
+    def run(self, site_property=None):
         """
         Write the input file to the scratch directory, run packmol and return
-        the packed molecule.
+        the packed molecule to the current working directory.
 
         Args:
-            copy_to_current_on_exit (bool): Whether or not to copy the packmol
-                input/output files from the scratch directory to the current
-                directory.
             site_property (str): if set then the specified site property
                 for the the final packed molecule will be restored.
 
         Returns:
                 Molecule object
         """
-        scratch = tempfile.gettempdir()
-        with ScratchDir(scratch, copy_to_current_on_exit=copy_to_current_on_exit) as scratch_dir:
+        with tempfile.TemporaryDirectory() as scratch_dir:
             self._write_input(input_dir=scratch_dir)
-            packmol_input = open(os.path.join(scratch_dir, self.input_file), 'r')
-            p = Popen(self.packmol_bin, stdin=packmol_input, stdout=PIPE, stderr=PIPE)
-            (stdout, stderr) = p.communicate()
-            output_file = os.path.join(scratch_dir, self.control_params["output"])
+            with open(os.path.join(scratch_dir, self.input_file), 'r') as packmol_input:
+                with Popen(self.packmol_bin, stdin=packmol_input, stdout=PIPE, stderr=PIPE) as p:
+                    (stdout, stderr) = p.communicate()
+            output_file = os.path.join(self.control_params["output"])
             if os.path.isfile(output_file):
                 packed_mol = BabelMolAdaptor.from_file(output_file,
                                                        self.control_params["filetype"])
@@ -324,12 +321,10 @@ class PackmolRunner:
                 if site_property:
                     packed_mol = self.restore_site_properties(site_property=site_property, filename=output_file)
                 return packed_mol
-            else:
-                print("Packmol execution failed")
-                print(stdout, stderr)
-                return None
+            raise RuntimeError("Packmol execution failed. %s\n%s" % (stdout, stderr))
 
-    def write_pdb(self, mol, filename, name=None, num=None):
+    @staticmethod
+    def write_pdb(mol, filename, name=None, num=None):
         """
         dump the molecule into pdb file with custom residue name and number.
         """
@@ -379,7 +374,7 @@ class PackmolRunner:
             Molecule object
         """
 
-        restore_site_props = True if residue_name is not None else False
+        restore_site_props = residue_name is not None
 
         if restore_site_props and not hasattr(self, "map_residue_to_mol"):
             self._set_residue_map()
@@ -450,10 +445,11 @@ class PackmolRunner:
 
 
 class LammpsRunner:
+    """
+    LAMMPS wrapper
+    """
     def __init__(self, input_filename="lammps.in", bin="lammps"):
         """
-        LAMMPS wrapper
-
         Args:
             input_filename (string): input file name
             bin (string): command to run, excluding the input file name

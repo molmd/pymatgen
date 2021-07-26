@@ -18,23 +18,24 @@ more info.
 
 """
 
-from collections import OrderedDict
-from io import StringIO
 import itertools
 import re
 import warnings
+from collections import OrderedDict
+from io import StringIO
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from monty.json import MSONable
-from monty.dev import deprecated
-from monty.serialization import loadfn
 from ruamel.yaml import YAML
 
+from monty.dev import deprecated
+from monty.json import MSONable
+from monty.serialization import loadfn
+
+from pymatgen import Molecule, Element, Lattice, Structure, SymmOp
 from pymatgen.util.io_utils import clean_lines
 from pymatgen.io.lammps.utils import PackmolRunner
-from pymatgen import Molecule, Element, Lattice, Structure, SymmOp
 
 __author__ = "Kiran Mathew, Zhi Deng, Tingzheng Hou"
 __copyright__ = "Copyright 2018, The Materials Virtual Lab"
@@ -393,7 +394,7 @@ class LammpsData(MSONable):
         section_template = "{kw}\n\n{df}\n"
         parts = []
         for k, v in body_dict.items():
-            index = True if k != "PairIJ Coeffs" else False
+            index = k != "PairIJ Coeffs"
             if k in ['Bond Coeffs', 'Angle Coeffs', 'Dihedral Coeffs', 'Improper Coeffs']:
                 listofdf = np.array_split(v, len(v.index))
                 df_string = ''
@@ -542,10 +543,9 @@ class LammpsData(MSONable):
                 ff_kw = k[:-1] + " Coeffs"
                 for topo in v.itertuples(False, None):
                     topo_idx = topo[0] - 1
-                    indices = topo[1:]
-                    mids = atoms_df.loc[indices, "molecule-ID"].unique()
-                    assert len(mids) == 1, \
-                        "Do not support intermolecular topology formed " \
+                    indices = list(topo[1:])
+                    mids = atoms_df.loc[indices]["molecule-ID"].unique()
+                    assert len(mids) == 1, "Do not support intermolecular topology formed " \
                         "by atoms with different molecule-IDs"
                     label = label_topo(indices)
                     topo_coeffs[ff_kw][topo_idx]["types"].append(label)
@@ -623,8 +623,6 @@ class LammpsData(MSONable):
                 match = re.match(v, l)
                 if match:
                     break
-                else:
-                    continue
             if match and k in ["counts", "types"]:
                 header[k][match.group(2)] = int(match.group(1))
             elif match and k == "bounds":
@@ -793,7 +791,8 @@ class LammpsData(MSONable):
         return cls(**items)
 
     @classmethod
-    def from_structure(cls, structure, ff_elements=None, atom_style="charge"):
+    def from_structure(cls, structure, ff_elements=None, atom_style="charge",
+                       is_sort=False):
         """
         Simple constructor building LammpsData from a structure without
         force field parameters and topologies.
@@ -804,10 +803,14 @@ class LammpsData(MSONable):
                 be present due to force field settings but not
                 necessarily in the structure. Default to None.
             atom_style (str): Choose between "atomic" (neutral) and
-            "charge" (charged). Default to "charge".
+                "charge" (charged). Default to "charge".
+            is_sort (bool): whether to sort sites
 
         """
-        s = structure.get_sorted_structure()
+        if is_sort:
+            s = structure.get_sorted_structure()
+        else:
+            s = structure.copy()
         box, symmop = lattice_2_lmpbox(s.lattice)
         coords = symmop.operate_multi(s.cart_coords)
         site_properties = s.site_properties
@@ -983,42 +986,42 @@ class Topology(MSONable):
         if not all((bond, bond_list)):
             # do not search for others if not searching for bonds or no bonds
             return cls(sites=molecule, **kwargs)
-        else:
-            angle_list, dihedral_list = [], []
-            dests, freq = np.unique(bond_list, return_counts=True)
-            hubs = dests[np.where(freq > 1)].tolist()
-            bond_arr = np.array(bond_list)
-            if len(hubs) > 0:
-                hub_spokes = {}
-                for hub in hubs:
-                    ix = np.any(np.isin(bond_arr, hub), axis=1)
-                    bonds = np.unique(bond_arr[ix]).tolist()
-                    bonds.remove(hub)
-                    hub_spokes[hub] = bonds
-            # skip angle or dihedral searching if too few bonds or hubs
-            dihedral = False if len(bond_list) < 3 or len(hubs) < 2 \
-                else dihedral
-            angle = False if len(bond_list) < 2 or len(hubs) < 1 else angle
 
-            if angle:
-                for k, v in hub_spokes.items():
-                    angle_list.extend([[i, k, j] for i, j in
-                                       itertools.combinations(v, 2)])
-            if dihedral:
-                hub_cons = bond_arr[np.all(np.isin(bond_arr, hubs), axis=1)]
-                for i, j in hub_cons.tolist():
-                    ks = [k for k in hub_spokes[i] if k != j]
-                    ls = [l for l in hub_spokes[j] if l != i]
-                    dihedral_list.extend([[k, i, j, l] for k, l in
-                                          itertools.product(ks, ls)
-                                          if k != l])
+        angle_list, dihedral_list = [], []
+        dests, freq = np.unique(bond_list, return_counts=True)
+        hubs = dests[np.where(freq > 1)].tolist()
+        bond_arr = np.array(bond_list)
+        if len(hubs) > 0:
+            hub_spokes = {}
+            for hub in hubs:
+                ix = np.any(np.isin(bond_arr, hub), axis=1)
+                bonds = np.unique(bond_arr[ix]).tolist()
+                bonds.remove(hub)
+                hub_spokes[hub] = bonds
+        # skip angle or dihedral searching if too few bonds or hubs
+        dihedral = False if len(bond_list) < 3 or len(hubs) < 2 \
+            else dihedral
+        angle = False if len(bond_list) < 2 or len(hubs) < 1 else angle
 
-            topologies = {k: v for k, v
-                          in zip(SECTION_KEYWORDS["topology"][:3],
-                                 [bond_list, angle_list, dihedral_list])
-                          if len(v) > 0}
-            topologies = None if len(topologies) == 0 else topologies
-            return cls(sites=molecule, topologies=topologies, **kwargs)
+        if angle:
+            for k, v in hub_spokes.items():
+                angle_list.extend([[i, k, j] for i, j in
+                                   itertools.combinations(v, 2)])
+        if dihedral:
+            hub_cons = bond_arr[np.all(np.isin(bond_arr, hubs), axis=1)]
+            for i, j in hub_cons.tolist():
+                ks = [k for k in hub_spokes[i] if k != j]
+                ls = [l for l in hub_spokes[j] if l != i]
+                dihedral_list.extend([[k, i, j, l] for k, l in
+                                      itertools.product(ks, ls)
+                                      if k != l])
+
+        topologies = {k: v for k, v
+                      in zip(SECTION_KEYWORDS["topology"][:3],
+                             [bond_list, angle_list, dihedral_list])
+                      if len(v) > 0}
+        topologies = None if len(topologies) == 0 else topologies
+        return cls(sites=molecule, topologies=topologies, **kwargs)
 
 
 class ForceField(MSONable):
@@ -1033,10 +1036,11 @@ class ForceField(MSONable):
 
     """
 
-    def _is_valid(self, df):
+    @staticmethod
+    def _is_valid(df):
         return not pd.isnull(df).values.any()
 
-    def __init__(self, mass_info, nonbond_coeffs=None, topo_coeffs=None):
+    def __init__(self, mass_info, nonbond_coeffs=None, topo_coeffs=None, check_duplicates=True):
         """
 
         Args:
@@ -1079,6 +1083,7 @@ class ForceField(MSONable):
                 be defined MORE THAN ONCE with DIFFERENT coefficients.
 
         """
+        self._check_duplicates = check_duplicates
         def map_mass(v):
             return v.atomic_mass.real if isinstance(v, Element) else Element(v).atomic_mass.real \
                 if isinstance(v, str) else v
@@ -1140,8 +1145,7 @@ class ForceField(MSONable):
                 seqs = [[0, 1, 2, 3], [0, 2, 1, 3],
                         [3, 1, 2, 0], [3, 2, 1, 0]]
                 return [tuple(label_arr[s]) for s in seqs]
-            else:
-                return [label] + [label[::-1]]
+            return [label] + [label[::-1]]
 
         main_data, distinct_types = [], []
         class2_data = {k: [] for k in self.topo_coeffs[kw][0].keys()
@@ -1151,20 +1155,30 @@ class ForceField(MSONable):
             distinct_types.append(d["types"])
             for k in class2_data.keys():
                 class2_data[k].append(d[k])
-        distinct_types = [set(itertools.
-                              chain(*[find_eq_types(t, kw)
-                                      for t in dt])) for dt in distinct_types]
-        type_counts = sum([len(dt) for dt in distinct_types])
-        type_union = set.union(*distinct_types)
-        assert len(type_union) == type_counts, "Duplicated items found " \
-                                               "under different coefficients in %s" % kw
+        if self._check_duplicates:
+            distinct_types = [set(itertools.
+                                  chain(*[find_eq_types(t, kw)
+                                          for t in dt])) for dt in distinct_types]
+            type_counts = sum([len(dt) for dt in distinct_types])
+            type_union = set.union(*distinct_types)
+            assert len(type_union) == type_counts, "Duplicated items found " \
+                                                   "under different coefficients in %s" % kw
+        else:
+            distinct_types = [list(itertools.
+                                  chain(*[find_eq_types(t, kw)
+                                          for t in dt])) for dt in distinct_types]
         atoms = set(np.ravel(list(itertools.chain(*distinct_types))))
         assert atoms.issubset(self.maps["Atoms"].keys()), \
             "Undefined atom type found in %s" % kw
         mapper = {}
-        for i, dt in enumerate(distinct_types):
-            for t in dt:
-                mapper[t] = i + 1
+        if self._check_duplicates:
+            for i, dt in enumerate(distinct_types):
+                for t in dt:
+                    mapper[t] = i + 1
+        else:
+            for i, dt in enumerate(distinct_types):
+                for t in dt:
+                    mapper[tuple(t)] = i + 1
 
         def process_data(data):
             df = pd.DataFrame(data)
@@ -1244,7 +1258,9 @@ class CombinedData(LammpsData):
 
         """
 
-        self.box = list_of_molecules[0].box
+        max_xyz = coordinates[['x', 'y', 'z']].max().max()
+        min_xyz = coordinates[['x', 'y', 'z']].min().min()
+        self.box = LammpsBox(np.array(3*[[min_xyz - 0.5, max_xyz + 0.5]]))
         self.atom_style = atom_style
         self.n = sum(list_of_numbers)
         self.names = list_of_names
@@ -1501,11 +1517,18 @@ class LammpsDataWrapper:
     Object for wrapping LammpsData object in pymatgen.io.lammps.data
     '''
 
-    def __init__(self,system_force_fields,system_mixture_data,cube_length,origin=[0.,0.,0.],
-                 seed=150,packmolrunner_inputs={'input_file':'pack.inp','tolerance':2.0,'filetype':'xyz',
-                           'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
-                           'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
-                           'site_property':None},length_increase=0.5):
+    def __init__(self,system_force_fields,
+                 system_mixture_data,
+                 cube_length,
+                 mixture_data_type='concentration',
+                 origin=[0.,0.,0.],
+                 seed=150,
+                 packmolrunner_inputs={'input_file':'pack.inp','tolerance':2.0,'filetype':'xyz',
+                                       'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
+                                       'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
+                                       'site_property':None},
+                 length_increase=0.5,
+                 check_ff_duplicates = True):
         '''
         Low level constructor designed to work with lists of dictionaries that should be able to be obtained from
             databases. Works for cubic boxes only using real coordinates.
@@ -1522,8 +1545,9 @@ class LammpsDataWrapper:
                 'Improper Topologies': [[a, b, c, d],...]
                 'Charges': [atom_a, ...]
             }, ...}
-        :param system_mixture_data: [dict] Contains molarity, density, and molar weights of solutes and solvents using
-            the following format:
+        :param system_mixture_data: [dict] Format depends on mixture_data_type input.
+            For mixture_data_type = 'concentration', this parameter contains molarity, density, and molar weights of
+            solutes and solvents using the following format:
             {
                 'Solutes': {unique_molecule_name: {
                                 'Initial Molarity': molarity_1i,
@@ -1538,21 +1562,36 @@ class LammpsDataWrapper:
                                 'Molar Weight': molar_weight_1
                             }, ...}
             }
+            For mixture_data_type = 'number of molecules', this parameter contains the number of molecules for each
+            species in the system in the following format:
+            {
+                unique_molecule_name: n_mols,
+                ...
+            }
+        :param mixture_data_type: [str] controls the format of the system_mixture_data parameter. Currently supports
+            values of 'concentration' and 'number of molecules'. Defaults to
         :param cube_length: [float] length of system box in angstroms.
         :param origin: [list] Optional. Change if the minimum xyz coordinates for desired box are not [0,0,0].
         :param seed: [int] Optional. Sets the seed for running packmol.
         :param packmolrunner_inputs: [dict] Optional. Parameters for PackmolRunner in pymatgen.io.lammps.utils
         '''
         self._ff_list = system_force_fields
-        if 'Solutes' in system_mixture_data.keys():
-            self._solutes = system_mixture_data['Solutes']
+        self._concentration_data = False
+        self._number_of_molecules_data = False
+        if mixture_data_type == 'concentration':
+            self._concentration_data = True
+            if 'Solutes' in system_mixture_data.keys():
+                self._solutes = system_mixture_data['Solutes']
 
-        else:
-            self._solutes = {}
-        if 'Solvents' in system_mixture_data.keys():
-            self._solvents = system_mixture_data['Solvents']
-        else:
-            self._solvents = {}
+            else:
+                self._solutes = {}
+            if 'Solvents' in system_mixture_data.keys():
+                self._solvents = system_mixture_data['Solvents']
+            else:
+                self._solvents = {}
+        elif mixture_data_type == 'number of molecules':
+            self._number_of_molecules_data = True
+            self._n_mol_dict = system_mixture_data
         self.length = cube_length
         self._origin = origin
 
@@ -1560,6 +1599,7 @@ class LammpsDataWrapper:
         self._packmolrunner_inputs = packmolrunner_inputs
 
         self._length_increase = length_increase
+        self._check_ff_duplicates = check_ff_duplicates
 
     @property
     def SortedNames(self):
@@ -1580,15 +1620,18 @@ class LammpsDataWrapper:
         :return packmol_params: [list] Info about number of atoms and box coordinates for packmol in Dicts for each
             molecule.
         '''
-        # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
-        solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
-        solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
-        solute_list = [self._solutes[name] for name in solute_names]
-        solvent_list = [self._solvents[name] for name in solvent_names]
+        if self._concentration_data:
+            # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
+            solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
+            solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
+            solute_list = [self._solutes[name] for name in solute_names]
+            solvent_list = [self._solvents[name] for name in solvent_names]
 
-        # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
-        nmolecules_initial, nmolecules_final = Calc_Num_Mols(self.length,solute_list,solvent_list)
-        nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
+            # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
+            nmolecules_initial, nmolecules_final = Calc_Num_Mols(self.length,solute_list,solvent_list)
+            nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
+        elif self._number_of_molecules_data:
+            nmol_dict = self._n_mol_dict
 
         # # Create list of min and max xyz coords
         xyz_high = list(np.add(self._origin,self.length))
@@ -1659,7 +1702,10 @@ class LammpsDataWrapper:
         if Improper_Param_List:
             System_Bonded_Params['Improper Coeffs'] = Improper_Param_List
         # System_Bonded_Params = {'Bond Coeffs':Bond_Param_List,'Angle Coeffs':Angle_Param_List,'Dihedral Coeffs':Dihedral_Param_List,'Improper Coeffs':Improper_Param_List}
-        System_Force_Field_Params = ForceField(Masses_Ordered_Dict.items(),Nonbonded_Param_List,System_Bonded_Params)
+        System_Force_Field_Params = ForceField(Masses_Ordered_Dict.items(),
+                                               Nonbonded_Param_List,
+                                               System_Bonded_Params,
+                                               check_duplicates=self._check_ff_duplicates)
         return System_Force_Field_Params
 
     def _run_packmol(self,verbose=False):
@@ -1739,7 +1785,8 @@ class LammpsDataWrapper:
 @deprecated(LammpsData.from_structure,
             "structure_2_lmpdata has been deprecated "
             "in favor of LammpsData.from_structure")
-def structure_2_lmpdata(structure, ff_elements=None, atom_style="charge"):
+def structure_2_lmpdata(structure, ff_elements=None, atom_style="charge",
+                        is_sort=False):
     """
     Converts a structure to a LammpsData object with no force field
     parameters and topologies.
@@ -1751,12 +1798,15 @@ def structure_2_lmpdata(structure, ff_elements=None, atom_style="charge"):
             the structure. Default to None.
         atom_style (str): Choose between "atomic" (neutral) and
             "charge" (charged). Default to "charge".
-
+        is_sort (bool): whether to sort the structure sites
     Returns:
         LammpsData
 
     """
-    s = structure.get_sorted_structure()
+    if is_sort:
+        s = structure.get_sorted_structure()
+    else:
+        s = structure.copy()
 
     a, b, c = s.lattice.abc
     m = s.lattice.matrix
