@@ -5,26 +5,33 @@
 """
 Module for interfacing with phonopy, see https://atztogo.github.io/phonopy/
 """
+from typing import Dict, List, Any
 
 import numpy as np
-from pymatgen.core import Structure, Lattice
-from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine, \
-    PhononBandStructure
-from pymatgen.phonon.dos import PhononDos, CompletePhononDos
-from monty.serialization import loadfn
 from monty.dev import requires
+from monty.serialization import loadfn
+from scipy.interpolate import InterpolatedUnivariateSpline
 
+from pymatgen.core import Lattice, Structure
+from pymatgen.phonon.bandstructure import (
+    PhononBandStructure,
+    PhononBandStructureSymmLine,
+)
+from pymatgen.phonon.dos import CompletePhononDos, PhononDos
+from pymatgen.phonon.gruneisen import GruneisenParameter, GruneisenPhononBandStructureSymmLine
 from pymatgen.symmetry.bandstructure import HighSymmKpath
 
 try:
     from phonopy import Phonopy
-    from phonopy.structure.atoms import PhonopyAtoms
     from phonopy.file_IO import write_disp_yaml
+    from phonopy.structure.atoms import PhonopyAtoms
 except ImportError:
     Phonopy = None
+    write_disp_yaml = None
+    PhonopyAtoms = None
 
 
-@requires(Phonopy, "phonopy not installed!")
+@requires(Phonopy, "phonopy not installed!")  # type: ignore
 def get_pmg_structure(phonopy_structure):
     """
     Convert a PhonopyAtoms object to pymatgen Structure object.
@@ -41,12 +48,15 @@ def get_pmg_structure(phonopy_structure):
     mms = phonopy_structure.get_magnetic_moments()
     mms = mms or [0] * len(symbols)
 
-    return Structure(lattice, symbols, frac_coords,
-                     site_properties={"phonopy_masses": masses,
-                                      "magnetic_moments": mms})
+    return Structure(
+        lattice,
+        symbols,
+        frac_coords,
+        site_properties={"phonopy_masses": masses, "magnetic_moments": mms},
+    )
 
 
-@requires(Phonopy, "phonopy not installed!")
+@requires(Phonopy, "phonopy not installed!")  # type: ignore
 def get_phonopy_structure(pmg_structure):
     """
     Convert a pymatgen Structure object to a PhonopyAtoms object.
@@ -58,8 +68,11 @@ def get_phonopy_structure(pmg_structure):
 
     symbols = [site.specie.symbol for site in pmg_structure]
 
-    return PhonopyAtoms(symbols=symbols, cell=pmg_structure.lattice.matrix,
-                        scaled_positions=pmg_structure.frac_coords)
+    return PhonopyAtoms(
+        symbols=symbols,
+        cell=pmg_structure.lattice.matrix,
+        scaled_positions=pmg_structure.frac_coords,
+    )
 
 
 def get_structure_from_dict(d):
@@ -73,21 +86,20 @@ def get_structure_from_dict(d):
     species = []
     frac_coords = []
     masses = []
-    if 'points' in d:
-        for p in d['points']:
-            species.append(p['symbol'])
-            frac_coords.append(p['coordinates'])
-            masses.append(p['mass'])
-    elif 'atoms' in d:
-        for p in d['atoms']:
-            species.append(p['symbol'])
-            frac_coords.append(p['position'])
-            masses.append(p['mass'])
+    if "points" in d:
+        for p in d["points"]:
+            species.append(p["symbol"])
+            frac_coords.append(p["coordinates"])
+            masses.append(p["mass"])
+    elif "atoms" in d:
+        for p in d["atoms"]:
+            species.append(p["symbol"])
+            frac_coords.append(p["position"])
+            masses.append(p["mass"])
     else:
-        raise ValueError('The dict does not contain structural information')
+        raise ValueError("The dict does not contain structural information")
 
-    return Structure(d['lattice'], species, frac_coords,
-                     site_properties={"phonopy_masses": masses})
+    return Structure(d["lattice"], species, frac_coords, site_properties={"phonopy_masses": masses})
 
 
 def eigvec_to_eigdispl(v, q, frac_coords, mass):
@@ -138,26 +150,31 @@ def get_ph_bs_symm_line_from_dict(bands_dict, has_nac=False, labels_dict=None):
     frequencies = []
     eigendisplacements = []
     phonopy_labels_dict = {}
-    for p in bands_dict['phonon']:
-        q = p['q-position']
+    for p in bands_dict["phonon"]:
+        q = p["q-position"]
         qpts.append(q)
         bands = []
         eig_q = []
-        for b in p['band']:
-            bands.append(b['frequency'])
-            if 'eigenvector' in b:
+        for b in p["band"]:
+            bands.append(b["frequency"])
+            if "eigenvector" in b:
                 eig_b = []
-                for i, eig_a in enumerate(b['eigenvector']):
+                for i, eig_a in enumerate(b["eigenvector"]):
                     v = np.zeros(3, np.complex)
                     for x in range(3):
                         v[x] = eig_a[x][0] + eig_a[x][1] * 1j
-                    eig_b.append(eigvec_to_eigdispl(
-                        v, q, structure[i].frac_coords,
-                        structure.site_properties['phonopy_masses'][i]))
+                    eig_b.append(
+                        eigvec_to_eigdispl(
+                            v,
+                            q,
+                            structure[i].frac_coords,
+                            structure.site_properties["phonopy_masses"][i],
+                        )
+                    )
                 eig_q.append(eig_b)
         frequencies.append(bands)
-        if 'label' in p:
-            phonopy_labels_dict[p['label']] = p['q-position']
+        if "label" in p:
+            phonopy_labels_dict[p["label"]] = p["q-position"]
         if eig_q:
             eigendisplacements.append(eig_q)
 
@@ -167,13 +184,19 @@ def get_ph_bs_symm_line_from_dict(bands_dict, has_nac=False, labels_dict=None):
     if eigendisplacements:
         eigendisplacements = np.transpose(eigendisplacements, (1, 0, 2, 3))
 
-    rec_latt = Lattice(bands_dict['reciprocal_lattice'])
+    rec_latt = Lattice(bands_dict["reciprocal_lattice"])
 
     labels_dict = labels_dict or phonopy_labels_dict
 
     ph_bs = PhononBandStructureSymmLine(
-        qpts, frequencies, rec_latt, has_nac=has_nac, labels_dict=labels_dict,
-        structure=structure, eigendisplacements=eigendisplacements)
+        qpts,
+        frequencies,
+        rec_latt,
+        has_nac=has_nac,
+        labels_dict=labels_dict,
+        structure=structure,
+        eigendisplacements=eigendisplacements,
+    )
 
     return ph_bs
 
@@ -193,8 +216,7 @@ def get_ph_bs_symm_line(bands_path, has_nac=False, labels_dict=None):
             --nac option. Default False.
         labels_dict: dict that links a qpoint in frac coords to a label.
     """
-    return get_ph_bs_symm_line_from_dict(loadfn(bands_path), has_nac,
-                                         labels_dict)
+    return get_ph_bs_symm_line_from_dict(loadfn(bands_path), has_nac, labels_dict)
 
 
 def get_ph_dos(total_dos_path):
@@ -222,7 +244,7 @@ def get_complete_ph_dos(partial_dos_path, phonopy_yaml_path):
     a = np.loadtxt(partial_dos_path).transpose()
     d = loadfn(phonopy_yaml_path)
 
-    structure = get_structure_from_dict(d['primitive_cell'])
+    structure = get_structure_from_dict(d["primitive_cell"])
 
     total_dos = PhononDos(a[0], a[1:].sum(axis=0))
 
@@ -234,8 +256,7 @@ def get_complete_ph_dos(partial_dos_path, phonopy_yaml_path):
 
 
 @requires(Phonopy, "phonopy not installed!")
-def get_displaced_structures(pmg_structure, atom_disp=0.01,
-                             supercell_matrix=None, yaml_fname=None, **kwargs):
+def get_displaced_structures(pmg_structure, atom_disp=0.01, supercell_matrix=None, yaml_fname=None, **kwargs):
     r"""
     Generate a set of symmetrically inequivalent displaced structures for
     phonon calculations.
@@ -263,16 +284,20 @@ def get_displaced_structures(pmg_structure, atom_disp=0.01,
         supercell_matrix = np.eye(3) * np.array((1, 1, 1))
 
     phonon = Phonopy(unitcell=ph_structure, supercell_matrix=supercell_matrix)
-    phonon.generate_displacements(distance=atom_disp,
-                                  is_plusminus=is_plusminus,
-                                  is_diagonal=is_diagonal,
-                                  is_trigonal=is_trigonal)
+    phonon.generate_displacements(
+        distance=atom_disp,
+        is_plusminus=is_plusminus,
+        is_diagonal=is_diagonal,
+        is_trigonal=is_trigonal,
+    )
 
     if yaml_fname is not None:
         displacements = phonon.get_displacements()
-        write_disp_yaml(displacements=displacements,
-                        supercell=phonon.get_supercell(),
-                        filename=yaml_fname)
+        write_disp_yaml(
+            displacements=displacements,
+            supercell=phonon.get_supercell(),
+            filename=yaml_fname,
+        )
 
     # Supercell structures with displacement
     disp_supercells = phonon.get_supercells_with_displacements()
@@ -293,9 +318,9 @@ def get_phonon_dos_from_fc(
     structure: Structure,
     supercell_matrix: np.ndarray,
     force_constants: np.ndarray,
-    mesh_density: float = 100.,
+    mesh_density: float = 100.0,
     num_dos_steps: int = 200,
-    **kwargs
+    **kwargs,
 ) -> CompletePhononDos:
     """
     Get a projected phonon density of states from phonopy force constants.
@@ -314,9 +339,7 @@ def get_phonon_dos_from_fc(
         The density of states.
     """
     structure_phonopy = get_phonopy_structure(structure)
-    phonon = Phonopy(
-        structure_phonopy, supercell_matrix=supercell_matrix, **kwargs
-    )
+    phonon = Phonopy(structure_phonopy, supercell_matrix=supercell_matrix, **kwargs)
     phonon.set_force_constants(force_constants)
     phonon.run_mesh(
         mesh_density,
@@ -331,12 +354,10 @@ def get_phonon_dos_from_fc(
     freq_max = frequencies.max()
     freq_pitch = (freq_max - freq_min) / num_dos_steps
 
-    phonon.run_projected_dos(
-        freq_min=freq_min, freq_max=freq_max, freq_pitch=freq_pitch
-    )
+    phonon.run_projected_dos(freq_min=freq_min, freq_max=freq_max, freq_pitch=freq_pitch)
 
     dos_raw = phonon.projected_dos.get_partial_dos()
-    pdoss = {s: dos for s, dos in zip(structure, dos_raw[1])}
+    pdoss = dict(zip(structure, dos_raw[1]))
 
     total_dos = PhononDos(dos_raw[0], dos_raw[1].sum(axis=0))
     return CompletePhononDos(structure, total_dos, pdoss)
@@ -348,7 +369,7 @@ def get_phonon_band_structure_from_fc(
     supercell_matrix: np.ndarray,
     force_constants: np.ndarray,
     mesh_density: float = 100.0,
-    **kwargs
+    **kwargs,
 ) -> PhononBandStructure:
     """
     Get a uniform phonon band structure from phonopy force constants.
@@ -366,16 +387,12 @@ def get_phonon_band_structure_from_fc(
         The uniform phonon band structure.
     """
     structure_phonopy = get_phonopy_structure(structure)
-    phonon = Phonopy(
-        structure_phonopy, supercell_matrix=supercell_matrix, **kwargs
-    )
+    phonon = Phonopy(structure_phonopy, supercell_matrix=supercell_matrix, **kwargs)
     phonon.set_force_constants(force_constants)
     phonon.run_mesh(mesh_density, is_mesh_symmetry=False, is_gamma_center=True)
     mesh = phonon.get_mesh_dict()
 
-    return PhononBandStructure(
-        mesh["qpoints"], mesh["frequencies"], structure.lattice
-    )
+    return PhononBandStructure(mesh["qpoints"], mesh["frequencies"], structure.lattice)
 
 
 @requires(Phonopy, "phonopy is required to calculate phonon band structures")
@@ -385,7 +402,7 @@ def get_phonon_band_structure_symm_line_from_fc(
     force_constants: np.ndarray,
     line_density: float = 20.0,
     symprec: float = 0.01,
-    **kwargs
+    **kwargs,
 ) -> PhononBandStructureSymmLine:
     """
     Get a phonon band structure along a high symmetry path from phonopy force
@@ -405,25 +422,259 @@ def get_phonon_band_structure_symm_line_from_fc(
         The line mode band structure.
     """
     structure_phonopy = get_phonopy_structure(structure)
-    phonon = Phonopy(
-        structure_phonopy,
-        supercell_matrix=supercell_matrix,
-        symprec=symprec,
-        **kwargs
-    )
+    phonon = Phonopy(structure_phonopy, supercell_matrix=supercell_matrix, symprec=symprec, **kwargs)
     phonon.set_force_constants(force_constants)
 
     kpath = HighSymmKpath(structure, symprec=symprec)
 
-    kpoints, labels = kpath.get_kpoints(
-        line_density=line_density, coords_are_cartesian=False
-    )
+    kpoints, labels = kpath.get_kpoints(line_density=line_density, coords_are_cartesian=False)
 
     phonon.run_qpoints(kpoints)
     frequencies = phonon.qpoints.get_frequencies().T
 
-    labels_dict = dict([(a, k) for a, k in zip(labels, kpoints) if a != ""])
+    labels_dict = {a: k for a, k in zip(labels, kpoints) if a != ""}
 
-    return PhononBandStructureSymmLine(
-        kpoints, frequencies, structure.lattice, labels_dict=labels_dict
+    return PhononBandStructureSymmLine(kpoints, frequencies, structure.lattice, labels_dict=labels_dict)
+
+
+def get_gruneisenparameter(gruneisen_path, structure=None, structure_path=None) -> GruneisenParameter:
+    """
+    Get Gruneisen object from gruneisen.yaml file, as obtained from phonopy (Frequencies in THz!).
+    The order is structure > structure path > structure from gruneisen dict.
+    Newer versions of phonopy include the structure in the yaml file,
+    the structure/structure_path is kept for compatibility.
+
+    Args:
+        gruneisen_path: Path to gruneisen.yaml file (frequencies have to be in THz!)
+        structure: pymatgen Structure object
+        structure_path: path to structure in a file (e.g., POSCAR)
+
+    Returns: GruneisenParameter object
+
+    """
+
+    gruneisen_dict = loadfn(gruneisen_path)
+
+    if structure_path and structure is None:
+        structure = Structure.from_file(structure_path)
+    else:
+        try:
+            structure = get_structure_from_dict(gruneisen_dict)
+        except ValueError:
+            raise ValueError("\nPlease provide a structure.\n")
+
+    qpts, multiplicities, frequencies, gruneisen = ([] for _ in range(4))
+    phonopy_labels_dict = {}
+
+    for p in gruneisen_dict["phonon"]:
+        q = p["q-position"]
+        qpts.append(q)
+        if "multiplicity" in p:
+            m = p["multiplicity"]
+        else:
+            m = 1
+        multiplicities.append(m)
+        bands, gruneisenband = ([] for _ in range(2))
+        for b in p["band"]:
+            bands.append(b["frequency"])
+            if "gruneisen" in b:
+                gruneisenband.append(b["gruneisen"])
+        frequencies.append(bands)
+        gruneisen.append(gruneisenband)
+        if "label" in p:
+            phonopy_labels_dict[p["label"]] = p["q-position"]
+
+    qpts_np = np.array(qpts)
+    multiplicities_np = np.array(multiplicities)
+    # transpose to match the convention in PhononBandStructure
+    frequencies_np = np.transpose(frequencies)
+    gruneisen_np = np.transpose(gruneisen)
+
+    return GruneisenParameter(
+        gruneisen=gruneisen_np,
+        qpoints=qpts_np,
+        multiplicities=multiplicities_np,
+        frequencies=frequencies_np,
+        structure=structure,
     )
+
+
+def get_gs_ph_bs_symm_line_from_dict(
+    gruneisen_dict, structure=None, structure_path=None, labels_dict=None, fit=False
+) -> GruneisenPhononBandStructureSymmLine:
+    r"""
+    Creates a pymatgen GruneisenPhononBandStructure object from the dictionary
+    extracted by the gruneisen.yaml file produced by phonopy. The labels
+    will be extracted from the dictionary, if present. If the 'eigenvector'
+    key is found the eigendisplacements will be calculated according to the
+    formula::
+
+        exp(2*pi*i*(frac_coords \\dot q) / sqrt(mass) * v
+
+    and added to the object. A fit algorithm can be used to replace diverging
+    Gruneisen values close to gamma.
+
+    Args:
+        gruneisen_dict (dict): the dictionary extracted from the gruneisen.yaml file
+        structure (Structure): pymatgen structure object
+        structure_path: path to structure file
+        labels_dict (dict): dict that links a qpoint in frac coords to a label.
+            Its value will replace the data contained in the band.yaml.
+        fit (bool): Substitute Grueneisen parameters close to the gamma point
+            with points obtained from a fit to a spline if the derivate from
+            a smooth curve (i.e. if the slope changes by more than 200% in the
+            range of 10% around the gamma point).
+            These derivations occur because of very small frequencies
+            (and therefore numerical inaccuracies) close to gamma.
+    """
+
+    if structure_path and structure is None:
+        structure = Structure.from_file(structure_path)
+    else:
+        try:
+            structure = get_structure_from_dict(gruneisen_dict)
+        except ValueError:
+            raise ValueError("\nPlease provide a structure.\n")
+
+    qpts, frequencies, gruneisenparameters = ([] for _ in range(3))
+    phonopy_labels_dict = {}  # type: Dict[Any,Any]
+
+    if fit:
+        for pa in gruneisen_dict["path"]:
+            phonon = pa["phonon"]  # This is a list
+            start = pa["phonon"][0]
+            end = pa["phonon"][-1]
+
+            if start["q-position"] == [0, 0, 0]:  # Gamma at start of band
+                qpts_temp, frequencies_temp, gruneisen_temp, distance = (
+                    [] for _ in range(4)
+                )  # type: List[Any],List[Any],List[Any],List[Any]
+                for i in range(pa["nqpoint"]):
+                    bands, gruneisenband = ([] for _ in range(2))  # type: List[Any], List[Any]
+                    for b in phonon[pa["nqpoint"] - i - 1]["band"]:
+                        bands.append(b["frequency"])
+                        # Fraction of leftover points in current band
+                        gruen = _extrapolate_grun(b, distance, gruneisen_temp, gruneisenband, i, pa)
+                        gruneisenband.append(gruen)
+                    q = phonon[pa["nqpoint"] - i - 1]["q-position"]
+                    qpts_temp.append(q)
+                    d = phonon[pa["nqpoint"] - i - 1]["distance"]
+                    distance.append(d)
+                    frequencies_temp.append(bands)
+                    gruneisen_temp.append(gruneisenband)
+                    if "label" in phonon[pa["nqpoint"] - i - 1]:
+                        phonopy_labels_dict[phonon[pa["nqpoint"] - i - 1]]["label"] = phonon[pa["nqpoint"] - i - 1][
+                            "q-position"
+                        ]
+
+                qpts.extend(list(reversed(qpts_temp)))
+                frequencies.extend(list(reversed(frequencies_temp)))
+                gruneisenparameters.extend(list(reversed(gruneisen_temp)))
+
+            elif end["q-position"] == [0, 0, 0]:  # Gamma at end of band
+                distance = []
+                for i in range(pa["nqpoint"]):
+                    bands, gruneisenband = ([] for _ in range(2))
+                    for b in phonon[i]["band"]:
+                        bands.append(b["frequency"])
+                        gruen = _extrapolate_grun(b, distance, gruneisenparameters, gruneisenband, i, pa)
+                        gruneisenband.append(gruen)
+                    q = phonon[i]["q-position"]
+                    qpts.append(q)
+                    d = phonon[i]["distance"]
+                    distance.append(d)
+                    frequencies.append(bands)
+                    gruneisenparameters.append(gruneisenband)
+                    if "label" in phonon[i]:
+                        phonopy_labels_dict[phonon[i]["label"]] = phonon[i]["q-position"]
+
+            else:  # No Gamma in band
+                distance = []
+                for i in range(pa["nqpoint"]):
+                    bands, gruneisenband = ([] for _ in range(2))
+                    for b in phonon[i]["band"]:
+                        bands.append(b["frequency"])
+                        gruneisenband.append(b["gruneisen"])
+                    q = phonon[i]["q-position"]
+                    qpts.append(q)
+                    d = phonon[i]["distance"]
+                    distance.append(d)
+                    frequencies.append(bands)
+                    gruneisenparameters.append(gruneisenband)
+                    if "label" in phonon[i]:
+                        phonopy_labels_dict[phonon[i]["label"]] = phonon[i]["q-position"]
+
+    else:
+        for pa in gruneisen_dict["path"]:
+            for p in pa["phonon"]:
+                q = p["q-position"]
+                qpts.append(q)
+                bands, gruneisen_bands = ([] for _ in range(2))
+                for b in p["band"]:
+                    bands.append(b["frequency"])
+                    gruneisen_bands.append(b["gruneisen"])
+                frequencies.append(bands)
+                gruneisenparameters.append(gruneisen_bands)
+                if "label" in p:
+                    phonopy_labels_dict[p["label"]] = p["q-position"]
+
+    qpts_np = np.array(qpts)
+    # transpose to match the convention in PhononBandStructure
+    frequencies_np = np.transpose(frequencies)
+    gruneisenparameters_np = np.transpose(gruneisenparameters)
+
+    rec_latt = structure.lattice.reciprocal_lattice
+    labels_dict = labels_dict or phonopy_labels_dict
+    return GruneisenPhononBandStructureSymmLine(
+        qpoints=qpts_np,
+        frequencies=frequencies_np,
+        gruneisenparameters=gruneisenparameters_np,
+        lattice=rec_latt,
+        labels_dict=labels_dict,
+        structure=structure,
+        eigendisplacements=None,
+    )
+
+
+def _extrapolate_grun(b, distance, gruneisenparameter, gruneisenband, i, pa):
+    leftover_fraction = (pa["nqpoint"] - i - 1) / pa["nqpoint"]
+    if leftover_fraction < 0.1:
+        diff = abs(b["gruneisen"] - gruneisenparameter[-1][len(gruneisenband)]) / abs(
+            gruneisenparameter[-2][len(gruneisenband)] - gruneisenparameter[-1][len(gruneisenband)]
+        )
+        if diff > 2:
+            x = list(range(len(distance)))
+            y = [i[len(gruneisenband)] for i in gruneisenparameter]
+            y = y[-len(x) :]  # Only elements of current band
+            extrapolator = InterpolatedUnivariateSpline(x, y, k=5)
+            g_extrapolated = extrapolator(len(distance))
+            gruen = float(g_extrapolated)
+        else:
+            gruen = b["gruneisen"]
+    else:
+        gruen = b["gruneisen"]
+    return gruen
+
+
+def get_gruneisen_ph_bs_symm_line(gruneisen_path, structure=None, structure_path=None, labels_dict=None, fit=False):
+    r"""
+    Creates a pymatgen GruneisenPhononBandStructure from a band.yaml file.
+    The labels will be extracted from the dictionary, if present.
+    If the 'eigenvector' key is found the eigendisplacements will be
+    calculated according to the formula:
+    \\exp(2*pi*i*(frac_coords \\dot q) / sqrt(mass) * v
+     and added to the object.
+
+    Args:
+        gruneisen_path: path to the band.yaml file
+        structure: pymaten Structure object
+        structure_path: path to a structure file (e.g., POSCAR)
+        labels_dict: dict that links a qpoint in frac coords to a label.
+        fit: Substitute Grueneisen parameters close to the gamma point
+            with points obtained from a fit to a spline if the derivate from
+            a smooth curve (i.e. if the slope changes by more than 200% in the
+            range of 10% around the gamma point).
+            These derivations occur because of very small frequencies
+            (and therefore numerical inaccuracies) close to gamma.
+    """
+    return get_gs_ph_bs_symm_line_from_dict(loadfn(gruneisen_path), structure, structure_path, labels_dict, fit)
