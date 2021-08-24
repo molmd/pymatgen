@@ -207,4 +207,149 @@ def write_lammps_inputs(
         elif isinstance(data, str) and os.path.exists(data):
             shutil.copyfile(data, os.path.join(output_dir, data_filename))
         else:
-            warnings.warn("No data file supplied. Skip writing %s." % data_filename)
+            warnings.warn("No data file supplied. Skip writing %s."
+                          % data_filename)
+
+class LammpsInput(dict, MSONable):
+    """
+    Object to read a LAMMPS input file to a python object
+    """
+    def __init__(self, params=None):
+        """"""
+        super().__init__()
+
+        if params:
+            self.update(params)
+
+    def __setitem__(self, key, val):
+        """
+        Add parameter-val pair to LammpsInput. Cleans the parameter and val
+        by stripping leading and trailing white spaces.
+        """
+        super().__setitem__(
+            key.strip(),
+            val.strip(),
+        )
+
+    def as_dict(self):
+        """
+        :return: MSONable dict.
+        """
+        d = dict(self)
+        d["@module"] = self.__class__.__module__
+        d["@class"] = self.__class__.__name__
+        return d
+
+    @classmethod
+    def from_dict(cls, d):
+        """
+        :param d: Dict representation.
+        :return: lammps_input
+        """
+        return LammpsInput({k: v for k, v in d.items() if k not in ("@module", "@class")})
+
+    def get_string(self, sort_keys=False, pretty=False):
+        """
+        Returns a string representation of the input file. The reason why this
+        method is different from the __str__ method is to provide options for
+        pretty printing.
+
+        Args:
+            sort_keys (bool): Set to True to sort the INCAR parameters
+                alphabetically. Defaults to False.
+            pretty (bool): Set to True for pretty aligned output. Defaults
+                to False.
+        """
+        keys = self.keys()
+        lines = []
+
+        for k in keys:
+            if isinstance(self[k], list):
+                lines.append([k, " ".join([str(i) for i in self[k]])])
+            else:
+                lines.append([k, self[k]])
+
+        if pretty:
+            return str(tabulate([[l[0], "", l[1]] for l in lines],
+                                tablefmt="plain"))
+        return str_delimited(lines, None, "\t") + "\n"
+
+    def __str__(self):
+        return self.get_string(sort_keys=False, pretty=True)
+
+    def write_file(self, filename):
+        """
+        Write LAMMPS input to a file.
+
+        Args:
+            filename (str): filename to write to.
+        """
+        with zopen(filename, "wt") as f:
+            f.write(self.__str__())
+
+    @staticmethod
+    def from_directory(input_dir, optional_files=None):
+        """
+        Read in a LAMMPS input file from a directory. Note that only the
+        standard input file is read unless optional_filenames is specified.
+
+        Args:
+            input_dir (str): Directory to read LAMMPS input from.
+            optional_files (dict): Optional files to read in as well as a
+                dict of {filename: Object type}. Object type must have a
+                static method from_file.
+        """
+        sub_d = {}
+        fullzpath = zpath(os.path.join(input_dir, "lammps_input"))
+        return LammpsInput.from_file(fullzpath)
+
+    @staticmethod
+    def from_file(filename):
+        """
+        Reads an LammpsInput object from a file.
+
+        Args:
+            filename (str): Filename for file
+
+        Returns:
+            LammpsInput object
+        """
+        with zopen(filename, "rt") as f:
+            return LammpsInput.from_string(f.read())
+
+    @staticmethod
+    def from_string(string):
+        """
+        Reads an LammpsInput object from a string.
+
+        Args:
+            string (str): LammpsInput string
+
+        Returns:
+            LammpsInput object
+        """
+        lines = list(string.splitlines())
+        params = {}
+        counter = 1
+        for line in lines:
+            line = line.replace("\t", " ")
+            m = line.strip().split(" ")
+            m = [el.strip() for el in m if el != ""]
+            if m:
+                if "#" in m:
+                    key = " ".join(m)
+                    val = " "
+                elif m[0] in COMMON_DUP_KEYWORDS:
+                    key = " ".join(m[:2])
+                    val = " ".join(m[2:])
+                else:
+                    key = m[0]
+                    val = " ".join(m[1:])
+            else:
+                key = " " * counter
+                val = " "
+                counter += 1
+            params[key] = val
+        print(params)
+        return LammpsInput(params)
+
