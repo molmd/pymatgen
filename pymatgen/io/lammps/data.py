@@ -43,7 +43,7 @@ __author__ = "Kiran Mathew, Zhi Deng, Tingzheng Hou"
 __copyright__ = "Copyright 2018, The Materials Virtual Lab"
 __version__ = "1.1"
 __maintainer__ = "Zhi Deng, Matthew Bliss, Tingzheng Hou"
-__email__ = "z4deng@eng.ucsd.edu, mbliss01@tufts.edu, " "tingzheng_hou@berkeley.edu"
+__email__ = "z4deng@eng.ucsd.edu, matthew.bliss@stonybrook.edu, " "tingzheng_hou@berkeley.edu"
 __date__ = "May 29, 2021"
 
 MODULE_DIR = Path(__file__).resolve().parent
