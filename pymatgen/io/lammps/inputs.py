@@ -20,8 +20,8 @@ from pymatgen.io.lammps.data import LammpsData
 __author__ = "Kiran Mathew, Brandon Wood, Zhi Deng"
 __copyright__ = "Copyright 2018, The Materials Virtual Lab"
 __version__ = "1.0"
-__maintainer__ = "Zhi Deng"
-__email__ = "z4deng@eng.ucsd.edu"
+__maintainer__ = "Zhi Deng, Matthew Bliss"
+__email__ = "z4deng@eng.ucsd.edu, matthew.bliss@stonybrook.edu"
 __date__ = "Aug 1, 2018"
 
 
