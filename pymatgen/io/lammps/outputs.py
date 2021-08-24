@@ -69,7 +69,8 @@ class LammpsDump(MSONable):
             bounds -= np.array([[min(x), max(x)], [min(y), max(y)], [0, 0]])
         box = LammpsBox(bounds, tilt)
         data_head = lines[8].replace("ITEM: ATOMS", "").split()
-        data = pd.read_csv(StringIO("\n".join(lines[9:])), names=data_head, delim_whitespace=True)
+        data = pd.read_csv(StringIO("\n".join(lines[9:])), names=data_head,
+                           delim_whitespace=True)
         return cls(timestep, natoms, box, data)
 
     @classmethod
@@ -134,7 +135,9 @@ class LammpsDump(MSONable):
             s_data = "\n".join(
                 [
                     " ".join(line.split()) for line in
-                    self.data[["element", "x", "y", "z"]].to_string(index=False, header=False).split("\n")
+                    self.data[["element", "x", "y", "z"]].to_string(index=False,
+                                                                    header=False).split(
+                        "\n")
                 ]
             )
             dump_string = "\n".join([s_natoms, s_comments, s_data])
@@ -249,18 +252,21 @@ def parse_lammps_log(filename="log.lammps"):
         multi_pattern = r"-+\s+Step\s+([0-9]+)\s+-+"
         # multi line thermo data
         if re.match(multi_pattern, lines[0]):
-            timestep_marks = [i for i, l in enumerate(lines) if re.match(multi_pattern, l)]
+            timestep_marks = [i for i, l in enumerate(lines) if
+                              re.match(multi_pattern, l)]
             timesteps = np.split(lines, timestep_marks)[1:]
             dicts = []
             kv_pattern = r"([0-9A-Za-z_\[\]]+)\s+=\s+([0-9eE\.+-]+)"
             for ts in timesteps:
                 data = {}
                 data["Step"] = int(re.match(multi_pattern, ts[0]).group(1))
-                data.update({k: float(v) for k, v in re.findall(kv_pattern, "".join(ts[1:]))})
+                data.update(
+                    {k: float(v) for k, v in re.findall(kv_pattern, "".join(ts[1:]))})
                 dicts.append(data)
             df = pd.DataFrame(dicts)
             # rearrange the sequence of columns
-            columns = ["Step"] + [k for k, v in re.findall(kv_pattern, "".join(timesteps[0][1:]))]
+            columns = ["Step"] + [k for k, v in
+                                  re.findall(kv_pattern, "".join(timesteps[0][1:]))]
             df = df[columns]
         # one line thermo data
         else:
@@ -271,5 +277,5 @@ def parse_lammps_log(filename="log.lammps"):
     if not ends:
         ends = [len(lines) - 1]
     for b, e in zip(begins, ends):
-        runs.append(_parse_thermo(lines[b + 1 : e]))
+        runs.append(_parse_thermo(lines[b + 1: e]))
     return runs
