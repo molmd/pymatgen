@@ -100,6 +100,74 @@ class LammpsDump(MSONable):
         d["data"] = self.data.to_json(orient="split")
         return d
 
+    def as_string(self,bound_type='pp',convert=None):
+        '''
+        Method for converting LammpsDump object into a string for writing to a file. Meant to be used w/ as_txt_file method.
+        :param bound_type (str): boundary type; for most cases it will be 'pp' for periodic boundary
+        :param convert (str or None): determines which file format the dump will output as.
+            Currently supports 'xyz' only. Defaults to None (same format as input dump file).
+        :return dump_string (str): all the information in the LammpsDump object in string form in the format of
+        the original dump file
+        '''
+        if not convert:
+            s_timestep = 'ITEM: TIMESTEP\n' + str(self.timestep)
+            s_natoms = 'ITEM: NUMBER OF ATOMS\n' + str(self.natoms)
+            bound_text = ''
+            for line in str(self.box).split('\n'):
+                bound_text = bound_text + line.split(' ')[0] + ' ' + line.split(' ')[1] + '\n'
+            bound_text = bound_text[:-1]
+            s_bounds = 'ITEM: BOX BOUNDS {} {} {}\n'.format(bound_type,bound_type,bound_type) + bound_text
+            data_list = [' '.join(line.split()) for line in self.data.to_string(index=False).split('\n')]
+            data_str = '\n'.join(data_list)
+            s_data = 'ITEM: ATOMS ' + data_str
+            dump_string = s_timestep + '\n' + s_natoms + '\n' + s_bounds + '\n' + s_data
+
+        if convert=='xyz':
+            s_natoms = str(self.natoms)
+            s_comments = 'Atoms. Timestep: ' + str(self.timestep)
+            s_data = '\n'.join([' '.join(line.split()) for line in self.data[['element','x','y','z']].to_string(index=False,header=False).split('\n')])
+            dump_string = '\n'.join([s_natoms,s_comments,s_data])
+        return dump_string
+
+    def as_txt_file(self,filename,bound_type='pp',convert=None,output=False):
+        '''
+        Method for writing LammpsDump object to text file in various formats
+        :param filename (str): desired filename of the written file
+        :param bound_type (str): boundary type; defaults to 'pp'
+        :param convert (str or None): for changing dump style or file type; see as_string method for details
+        :param ouput (Bool): If True, prints current filename. Defaults to False
+        :return: None
+        '''
+        with open(filename,'w') as file:
+            file.write(self.as_string(bound_type=bound_type,convert=convert))
+        if output:
+            print('Wrote file named: ' + filename)
+
+
+def remove_unwrapped_coords(file_name, new_file_name=None):
+    '''
+    Takes a dump file with many frames, removes the unwrapped coordinates and box images, and writes the new frames to
+    a single dump file.
+    :param file_name: (str) The file name of the original dump file
+    :param new_file_name: (str or None) The file name of the new dump file. If None, the name will be the same as that
+        of the original
+    :return: None
+    '''
+    Dump_strings = []
+    if not new_file_name:
+        new_file_name = file_name
+    Dumps = list(parse_lammps_dumps(file_name))
+    unwanted_columns = {'ix', 'iy', 'iz', 'xu', 'yu', 'zu'}
+    for Dump in Dumps:
+        columns = Dump.data.columns.values.tolist()
+        new_columns = [col for col in columns if col not in unwanted_columns]
+        Dump.data = Dump.data[new_columns]
+        Dump_strings.append(Dump.as_string())
+    Dump_string_full = '\n'.join(Dump_strings)
+
+    with open(new_file_name, 'w') as f:
+        f.write(Dump_string_full)
+
 
 def parse_lammps_dumps(file_pattern):
     """
@@ -188,6 +256,8 @@ def parse_lammps_log(filename="log.lammps"):
         return df
 
     runs = []
+    if not ends:
+        ends = [len(lines) - 1]
     for b, e in zip(begins, ends):
         runs.append(_parse_thermo(lines[b + 1 : e]))
     return runs

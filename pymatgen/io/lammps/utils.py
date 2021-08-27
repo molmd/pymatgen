@@ -190,27 +190,31 @@ class PackmolRunner:
         auto_box=True,
         output_file="packed.xyz",
         bin="packmol",
+        encode=False
     ):
         """
         Args:
-            mols:
-                list of Molecules to pack
-            input_file:
-                name of the packmol input file
-            tolerance:
-                min distance between the atoms
-            filetype:
-                input/output structure file type
-            control_params:
-                packmol control parameters dictionary. Basically
-                all parameters other than structure/atoms
-            param_list:
-                list of parameters containing dicts for each molecule
-            auto_box:
-                put the molecule assembly in a box
-            output_file:
-                output file name. The extension will be adjusted
-                according to the filetype
+              mols:
+                   list of Molecules to pack
+              input_file:
+                        name of the packmol input file
+              tolerance:
+                        min distance between the atoms
+              filetype:
+                       input/output structure file type
+              control_params:
+                           packmol control parameters dictionary. Basically
+                           all parameters other than structure/atoms
+              param_list:
+                    list of parameters containing dicts for each molecule
+              auto_box:
+                    put the molecule assembly in a box
+              output_file:
+                    output file name. The extension will be adjusted
+                    according to the filetype
+              encode:
+                    fix for keeping the filenames as normal strings. if True, then
+                    filenames will be byte strings, which causes errors with pybel.
         """
         self.packmol_bin = bin.split()
         if not which(self.packmol_bin[-1]):
@@ -234,6 +238,7 @@ class PackmolRunner:
             self.control_params["output"] = "{}.{}".format(output_file.split(".")[0], self.control_params["filetype"])
         if self.boxit:
             self._set_box()
+        self.encode = encode
 
     @staticmethod
     def _format_param_val(param_val):
@@ -277,7 +282,14 @@ class PackmolRunner:
             # the molecule id and the corresponding filename in the packmol
             # input file.
             for idx, mol in enumerate(self.mols):
-                filename = os.path.join(input_dir, "{}.{}".format(idx, self.control_params["filetype"]))
+                if self.encode:
+                    filename = os.path.join(
+                        input_dir, '{}.{}'.format(
+                            idx, self.control_params["filetype"])).encode("ascii")
+                else:
+                    filename = os.path.join(
+                        input_dir, '{}.{}'.format(
+                            idx, self.control_params["filetype"]))
                 # pdb
                 if self.control_params["filetype"] == "pdb":
                     self.write_pdb(mol, filename, num=idx + 1)
