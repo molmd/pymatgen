@@ -20,7 +20,8 @@ try:
     from openbabel import openbabel as ob
     from openbabel import pybel as pb
 except Exception:
-    ob = None
+    import openbabel as ob
+    import pybel as pb
 
 
 __author__ = "Shyue Ping Ong, Qi Wang"

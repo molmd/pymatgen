@@ -354,7 +354,7 @@ def check_partial_charge_sum(partial_charges, net_charge=0, tolerance=10**-16):
     if charge_difference > tolerance:
         p_charges_array += correction
     elif charge_difference < -tolerance:
-        p_charges_array -= correction
+        p_charges_array += correction
     return p_charges_array
 
 def prmtop_to_python(file_name, pmg_molecule, ff_label, tolerance=10**-16):
@@ -375,7 +375,7 @@ def prmtop_to_python(file_name, pmg_molecule, ff_label, tolerance=10**-16):
         'Angles': [{'coeffs': [k_1, theta_eq_1], 'types': [('atom_a' + ff_label, 'atom_b' + ff_label, 'atom_c' + ff_label), ...]}, ...],
         'Dihedrals': [{'coeffs': [phi_k_1, phase_1, per_1], 'types': [('atom_a' + ff_label, 'atom_b' + ff_label, 'atom_c' + ff_label, 'atom_d' + ff_label), ...]}, ...],
         'Impropers': [{'coeffs': [phi_k_1, phase_1, per_1], 'types': [('atom_a' + ff_label, 'atom_b' + ff_label, 'atom_c' + ff_label, 'atom_d' + ff_label), ...]}, ...],
-        'Charges': Array([charge_1, ...])
+        'Charges': [charge_1, ...]
     '''
     Amberparm = pmd.load_file(file_name)
     Bond_parm = get_bond_param(Amberparm, ff_label)
@@ -383,7 +383,9 @@ def prmtop_to_python(file_name, pmg_molecule, ff_label, tolerance=10**-16):
     Dihedral_parm, Improper_parm = get_dihedral_param(Amberparm, ff_label)
     Masses, Nonbond_parm = get_nonbond_param(Amberparm, ff_label)
     Charges = np.asarray(Amberparm.parm_data[Amberparm.charge_flag])
-    Corrected_Charges = check_partial_charge_sum(Charges, pmg_molecule.charge, tolerance)
+    Corrected_Charges = list(check_partial_charge_sum(Charges,
+                                                      pmg_molecule.charge,
+                                                      tolerance))
 
     PyParm = {'Molecule': pmg_molecule,
               'Masses': Masses,
@@ -596,8 +598,8 @@ class PrmtopParser:
             if charge_difference > self._tolerance:
                 Charges_array += charge_correction
             elif charge_difference < -self._tolerance:
-                Charges_array -= charge_correction
-        return Charges_array
+                Charges_array += charge_correction
+        return list(Charges_array)
 
 
     def to_dict(self):

@@ -28,6 +28,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from ruamel.yaml import YAML
+from doepy import build
 
 from monty.dev import deprecated
 from monty.json import MSONable
@@ -80,6 +81,7 @@ ATOMS_HEADERS = {"angle": ["molecule-ID", "type", "x", "y", "z"],
                  "full": ["molecule-ID", "type", "q", "x", "y", "z"],
                  "molecular": ["molecule-ID", "type", "x", "y", "z"]}
 
+AVOGADRO = 6.02214086 * 10 ** 23 # mol^-1
 
 class LammpsBox(MSONable):
     """
@@ -1464,39 +1466,48 @@ def split_by_mult_mol(Pkml_mols,Pkml_parms,Mix,Site_props=None):
 
 def Calc_Num_Mols(box_volume,solute_list,solvent_list):
     '''
-    Calculates the number of molecules for each molecular species in the system. This is important to obtain the input
-        information for the PackmolRunner class in pymatgen.io.lammps.utils. The desired output is the second element
+    Calculates the number of molecules for each molecular species in the system.
+        This is important to obtain the input information for the PackmolRunner
+        class in pymatgen.io.lammps.utils. The desired output is the second element
         of the output tuple
-    :param box_volume: [float] the volume of the system box in cubic angstroms. Intended to be obtained from LammpsBox.volume
-    :param solute_list: [list] contains Dictionaries with the following as keys: ['Initial Molarity', 'Final Molarity',
-        'Density', 'Molar Weight'] for each molecular species that is a solute (ie has a defined molarity). 'Initial Molarity'
-        and 'Final Molarity' will be equal unless some of the solute is transformed into another molecular species upon mixing
-        (eg 1 M DHPS in 4 M NaOH (aq) will become 1 M DHPS^-3, 4 M Na^+, 1 M OH^- after mixing; the 'Initial Molarity' of
-        OH^- is 4 and the 'Final Molarity' of OH^- is 1)
-    :param solvent_list: [list] the same as solute list, except there is no 'Initial Molarity' or 'Final Molarity' in the
-        keys. Currently only supports a solvent with one type of molecule (ie the length of this parameter should be 1)
-    :return: [tuple] Contains two elements. Both elements are lists of the number of molecules in the system, with the first
-        elements corresponding to those in the solute_list, and the last elements corresponding to those in the solvent list.
-        The first list is based on the 'Initial Molarity' of each solute molecule only. The purpose of this is mainly for
-        checking whether the correct number of molecules has been transferred to another component. The second list is the
-        desired output, which is based on the 'Final Molarity' of each solute. For the second list, the number of solvent
-        molecules is increased by the difference between the number of solute molecules from the 'Initial Molarity' and
-        'Final Molarity'
+    :param box_volume: [float] the volume of the system box in cubic angstroms.
+        Intended to be obtained from LammpsBox.volume
+    :param solute_list: [list] contains Dictionaries with the following as keys:
+        ['Initial Molarity', 'Final Molarity', 'Density', 'Molar Weight'] for
+        each molecular species that is a solute (ie has a defined molarity).
+        'Initial Molarity' and 'Final Molarity' will be equal unless some of
+        the solute is transformed into another molecular species upon mixing
+        (eg 1 M DHPS in 4 M NaOH (aq) will become 1 M DHPS^-3, 4 M Na^+,
+        1 M OH^- after mixing; the 'Initial Molarity' of OH^- is 4 and the
+        'Final Molarity' of OH^- is 1).
+    :param solvent_list: [list] the same as solute list, except there is no
+        'Initial Molarity' or 'Final Molarity' in the keys. Currently only
+        supports a solvent with one type of molecule (ie the length of this
+        parameter should be 1).
+    :return: [tuple] Contains two elements. Both elements are lists of the number
+        of molecules in the system, with the first elements corresponding to
+        those in the solute_list, and the last elements corresponding to those in
+        the solvent list. The first list is based on the 'Initial Molarity' of
+        each solute molecule only. The purpose of this is mainly for checking
+        whether the correct number of molecules has been transferred to another
+        component. The second list is the desired output, which is based on the
+        'Final Molarity' of each solute. For the second list, the number of solvent
+        molecules is increased by the difference between the number of solute
+        molecules from the 'Initial Molarity' and 'Final Molarity'.
     '''
     # assert len(solvent_list) == 1
     if len(solvent_list) != 1:
         print(len(solvent_list))
         raise ValueError('The length of the solvent list must be 1.')
-    avogadro = 6.02214086 * 10 ** 23 # mol^-1
     volumes_initial = np.zeros(len(solute_list)+len(solvent_list))
     volumes_final = volumes_initial.copy()
     nmols_initial = volumes_initial.copy()
     nmols_final = volumes_initial.copy()
     for i, solute in enumerate(solute_list):
-        nmols_initial[i] = int(round(solute['Initial Molarity'] * avogadro * 10**3 * 10**-30 * box_volume))
-        nmols_final[i] = int(round(solute['Final Molarity'] * avogadro * 10**3 * 10**-30 * box_volume))
-        volumes_initial[i] = nmols_initial[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
-        volumes_final[i] = nmols_final[i] / avogadro * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
+        nmols_initial[i] = int(round(solute['Initial Molarity'] * AVOGADRO * 10**3 * 10**-30 * box_volume))
+        nmols_final[i] = int(round(solute['Final Molarity'] * AVOGADRO * 10**3 * 10**-30 * box_volume))
+        volumes_initial[i] = nmols_initial[i] / AVOGADRO * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
+        volumes_final[i] = nmols_final[i] / AVOGADRO * solute['Molar Weight'] / solute['Density'] * 100**-3 * 10**30
     if solute_list:
         volumes_initial[-1] = box_volume - np.sum(volumes_initial)
     else:
@@ -1504,12 +1515,89 @@ def Calc_Num_Mols(box_volume,solute_list,solvent_list):
     extra_solvent = np.sum(np.subtract(nmols_initial,nmols_final))
     # assert extra_solvent >= 0
     if solute_list:
-        nmols_initial[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[-1]))
-        nmols_final[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[-1] + extra_solvent))
+        nmols_initial[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * AVOGADRO * volumes_initial[-1]))
+        nmols_final[-1] = int(round(solvent_list[0]['Density'] * 100**3 * 10**-30 / solvent_list[0]['Molar Weight'] * AVOGADRO * volumes_initial[-1] + extra_solvent))
     else:
-        nmols_initial[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[0]))
-        nmols_final[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * avogadro * volumes_initial[0] + extra_solvent))
+        nmols_initial[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * AVOGADRO * volumes_initial[0]))
+        nmols_final[0] = int(round(solvent_list[0]['Density'] * 100 ** 3 * 10 ** -30 / solvent_list[0]['Molar Weight'] * AVOGADRO * volumes_initial[0] + extra_solvent))
     return nmols_initial, nmols_final
+
+
+def Check_Sys_Charge(n_mols, volume, solute_list, solvent_list, max_change = 5, lambdas = [1, 1, 1]):
+    """
+    Checks that the number of molecules for each species yields a net system charge of 0. If that is
+        not the case, the function determines what the number of molecules for each species should be
+        in order to make the net charge 0 while making sure that the new number of molecules is sufficiently
+        close to the set system based on concentration, not needlessly changing the numbers, and ratio of solutes
+        to the first one in the solute list.
+    :param n_mols: [list] Contains the number of molecules for each species in the system. Intended to
+        be the output of Calc_Num_Mols().
+    :param volume: [float or int] the volume of the system in cubic angstroms.
+    :param solute_list: [list of dicts] list of system mixture dictionaries for the solutes.
+    :param solvent_list: [list of dicts] list of system mixture dictionaries for the solvents.
+    :param max_change: [int] The maximum value each number of molecules can be altered. Defaults to 5.
+    :param lambdas: [list] The weights for each component of the loss function. The order corresponds to
+        the following components: concentration, number of changes, and ratio. The first value may need to
+        be increased. Defaults to [1, 1, 1].
+    :return: [tuple] Contains two elements. The first is the number of molecules as an np.array of shape (1, x),
+        where x is the number of species in the system. The second element is the net system charge.
+    """
+    solute_charges = [i["Charge"] for i in solute_list]
+    solvent_charges = [i["Charge"] for i in solvent_list]
+    charges = solute_charges + solvent_charges
+
+    sys_charge = np.sum(np.multiply(n_mols, charges))
+
+    if sys_charge == 0:
+        return n_mols, sys_charge
+
+    # # Check all arrangements of changing number of molecules for each species
+    # # up to max_change.
+    # Create matrix whose rows contain all such arrangements: design_mat.
+    raw_design_vals = np.reshape(np.arange(-1 * max_change, 1 + max_change, 1), (-1, 2 * max_change + 1))
+    full_fact_dict = dict(zip(np.arange(0, len(charges), 1), np.repeat(raw_design_vals, len(charges), axis=0)))
+    raw_design_mat = build.full_fact(full_fact_dict).values
+    nmol_mat = np.repeat(np.reshape(np.asarray(n_mols), (-1, len(n_mols))), np.shape(raw_design_mat)[0], axis=0)
+    design_mat = np.add(raw_design_mat, nmol_mat)
+
+    # calculate sum of squared errors relating to concentration for each arrangement
+    set_conc = np.reshape(np.asarray([i["Final Molarity"] for i in solute_list]), (-1, len(solute_list)))
+    set_conc_mat = np.repeat(set_conc, np.shape(design_mat)[0], axis=0)
+    conc_const = 1 / AVOGADRO / volume * (10 ** 30) / (10 ** 3)
+    design_conc_mat = np.multiply(design_mat, conc_const)
+    conc_err_mat = np.subtract(design_conc_mat[:, :len(solute_list)], set_conc_mat)
+    conc_sq_err_mat = np.square(conc_err_mat)
+    conc_sum_sq_err = np.multiply(np.sum(conc_sq_err_mat, axis=1), lambdas[0])
+
+    # calculate penalty for the size of change of molecules for each arrangement
+    size_sq_mat = np.square(raw_design_mat)
+    size_sum_sq = np.multiply(np.sum(size_sq_mat, axis=1), lambdas[1])
+
+    # calculate sum of squared errors relating to the ratio to first solute for each arrangement
+    set_ratio = np.divide(set_conc, set_conc[0, 0])
+    set_ratio_mat = np.repeat(set_ratio, np.shape(design_mat)[0], axis=0)
+    design_ratio_mat = np.divide(design_mat[:, : len(solute_list)], np.repeat(np.reshape(design_mat[:, 0], (len(design_mat), 1)), len(solute_list), axis=1))
+    ratio_err_mat = np.subtract(design_ratio_mat, set_ratio_mat)
+    ratio_sq_err_mat = np.square(ratio_err_mat)
+    ratio_sum_sq_err = np.multiply(np.sum(ratio_sq_err_mat, axis=1), lambdas[2])
+
+    # calculate loss function for each arangement
+    loss_func = np.add(np.add(conc_sum_sq_err, size_sum_sq), ratio_sum_sq_err)
+
+    # get indices of arrangements that yield 0 net charge
+    mol_charges = np.repeat(np.reshape(np.asarray(charges), (-1, len(charges))), np.shape(design_mat)[0], axis=0)
+    design_charges_mat = np.multiply(design_mat, mol_charges)
+    design_charges = np.sum(design_charges_mat, axis=1)
+    zero_charge_ind = np.flatnonzero(design_charges == 0)
+    if len(zero_charge_ind) == 0:
+        return n_mols, sys_charge
+
+    # take minimum value of loss function of arrangement that yields 0 net charge
+    loss_func_zero = loss_func[zero_charge_ind]
+    loss_func_zero_min_ind = np.flatnonzero(loss_func_zero == loss_func_zero.min())
+    design_mat_zero = design_mat[zero_charge_ind]
+    n_mols_opt = design_mat_zero[loss_func_zero_min_ind][0]
+    return n_mols_opt, 0
 
 
 class LammpsDataWrapper:
@@ -1527,7 +1615,7 @@ class LammpsDataWrapper:
                                        'control_params':{'maxit':20,'nloop':600,'seed':150},'auto_box':False,
                                        'output_file':'packed.xyz','bin':'packmol','copy_to_current_on_exit':False,
                                        'site_property':None},
-                 length_increase=0.0,
+                 length_increase=0.5,
                  check_ff_duplicates = True,
                  box_data_type = "cubic"):
         '''
@@ -1624,6 +1712,38 @@ class LammpsDataWrapper:
         return molecule_name_list
 
     @property
+    def nmol_dict(self):
+        if self._concentration_data:
+            # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
+            solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
+            solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
+            solute_list = [dict(itertools.chain(self._solutes[name].items(),
+                                                {"Charge": self._ff_list[name]["Molecule"].charge}.items())) \
+                                for name in solute_names]
+            solvent_list = [dict(itertools.chain(self._solvents[name].items(),
+                                                 {"Charge": self._ff_list[name]["Molecule"].charge}.items())) \
+                    for name in solvent_names]
+
+            # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
+            nmolecules_initial, nmolecules_final = Calc_Num_Mols(self._initial_lammps_box.volume,
+                                                                 solute_list,
+                                                                 solvent_list)
+
+            # # Check that the net charge of the system is zero
+            nmols_checked, charge_checked = Check_Sys_Charge(nmolecules_final,
+                                                             self._initial_lammps_box.volume,
+                                                             solute_list,
+                                                             solvent_list)
+            print(nmols_checked)
+            nmol_dict = dict(zip(solute_names+solvent_names,
+                                 nmols_checked))
+
+        elif self._number_of_molecules_data:
+            nmol_dict = self._n_mol_dict
+
+        return nmol_dict
+
+    @property
     def PackmolParamList(self):
         '''
         Prepares the param_list input for PackmolRunner in pymatgen.io.lammps.utils. Assumes that all molecules are put
@@ -1631,18 +1751,7 @@ class LammpsDataWrapper:
         :return packmol_params: [list] Info about number of atoms and box coordinates for packmol in Dicts for each
             molecule.
         '''
-        if self._concentration_data:
-            # # Convert _solute and _solvent info to lists, preserving order with respect to SortedNames
-            solute_names = [name for name in self.SortedNames if name in self._solutes.keys()]
-            solvent_names = [name for name in self.SortedNames if name in self._solvents.keys()]
-            solute_list = [self._solutes[name] for name in solute_names]
-            solvent_list = [self._solvents[name] for name in solvent_names]
-
-            # # Set the number of molecules based on molarity, density, and molar weight as values of Dict with keys of the unique_molecule_name
-            nmolecules_initial, nmolecules_final = Calc_Num_Mols(self._initial_lammps_box.volume,solute_list,solvent_list)
-            nmol_dict = dict(zip(solute_names+solvent_names,nmolecules_final))
-        elif self._number_of_molecules_data:
-            nmol_dict = self._n_mol_dict
+        nmol_dict = self.nmol_dict
 
         # # Create list of min and max xyz coords
         self.xyz_low = [bound[0] for bound in self._initial_lammps_box.as_dict()['bounds']]
@@ -1652,6 +1761,8 @@ class LammpsDataWrapper:
         # # make packmol input list preserving the order of SortedNames
         packmol_params = [{'number': int(nmol_dict[name]), 'inside box': box_xyz} for name in self.SortedNames]
         return packmol_params
+
+
 
     @property
     def PackmolMolList(self):
@@ -1799,6 +1910,10 @@ class LammpsDataWrapper:
                                                                atom_style=atom_style)
         return System_Lammps_Data
 
+    @property
+    def ff_list(self):
+        return self._ff_list
+
 
 @deprecated(LammpsData.from_structure,
             "structure_2_lmpdata has been deprecated "
@@ -1850,3 +1965,225 @@ def structure_2_lmpdata(structure, ff_elements=None, atom_style="charge",
     topo = Topology(s)
     return LammpsData.from_ff_and_topologies(box=box, ff=ff, topologies=[topo],
                                              atom_style=atom_style)
+
+
+if __name__ == "__main__":
+    # 1466
+
+    # # # Convert _solute and _solvent info solvent_names]
+
+    solute_names = ["phen", "oh", "na"]
+    solute_charges = [-3, -1, 1]
+    solvent_names = ["wat"]
+    solvent_charges = [0]
+
+    x = 1.0
+
+    box_volume = 70.9 ** 3
+    solute_list = [{"Initial Molarity": x,
+                    "Final Molarity": x,
+                    "Density": 1.25,
+                    "Molar Weight": 180.21,
+                    "Charge": -3},
+                   {"Initial Molarity": 3 * x + 1,
+                    "Final Molarity": 1,
+                    "Density": 2.13,
+                    "Molar Weight": 17.007,
+                    "Charge": -1},
+                   {"Initial Molarity": 3 * x + 1,
+                    "Final Molarity": 3 * x + 1,
+                    "Density": 2.13,
+                    "Molar Weight": 22.990,
+                    "Charge": 1}]
+    solvent_list = [{"Density": 0.99705,
+                     "Molar Weight": 18.015,
+                     "Charge": 0}]
+
+    nmols_init, nmols_fin = Calc_Num_Mols(box_volume, solute_list, solvent_list)
+    print(nmols_fin)
+    system_charges = np.multiply(solute_charges+solvent_charges, nmols_fin)
+    print(system_charges)
+    sys_charge = np.sum(system_charges)
+    print(sys_charge)
+
+
+    # import pyDOE
+    from timeit import default_timer as timer
+    val_list = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
+    auto_val_list = np.arange(-5, 6, 1)
+    print(auto_val_list)
+    # val_list = np.asarray([-1, 0, 1])
+    start = timer()
+    design_mat = build.full_fact({"phen": val_list,
+                                        "oh": val_list,
+                                        "na": val_list,
+                                        "wat": val_list}).values
+    # design_mat = pyDOE.fullfact(np.asarray([2, 3], dtype=np.int32))
+    elapsed_time = timer() - start
+    print(elapsed_time)
+    print(type(design_mat))
+    print(design_mat[:40])
+    print(np.shape(design_mat))
+    final_mol_array = np.reshape(np.asarray(nmols_fin),(-1, 4))
+
+    print(final_mol_array)
+    print(np.shape(final_mol_array))
+    final_mol_two_d_arr = np.repeat(final_mol_array, np.shape(design_mat)[0], axis=0)
+
+    nmol_design_mat = np.add(design_mat, final_mol_two_d_arr)
+    print(nmol_design_mat)
+
+    conc_const = 1 / AVOGADRO / box_volume * (10 ** 30) / (10 ** 3)
+    conc_mat = nmol_design_mat[:,:len(solute_names)] * conc_const
+    # print(np.shape(conc_mat))
+    orig_conc = np.reshape(np.asarray([i["Final Molarity"] for i in solute_list]), (-1, len(solute_list)))
+    # print(np.shape(orig_conc))
+    # print(orig_conc)
+    orig_conc_mat = np.repeat(orig_conc, np.shape(conc_mat)[0], axis=0)
+    # print(np.shape(orig_conc_mat))
+
+    err_conc_mat = np.subtract(conc_mat, orig_conc_mat)
+    # print(np.shape(err_conc_mat))
+    # print(err_conc_mat)
+
+    sq_err_conc_mat = np.square(err_conc_mat)
+    # print(np.shape(sq_err_conc_mat))
+    # print(sq_err_conc_mat)
+
+    sum_sq_err_mat = np.sum(sq_err_conc_mat, axis=1)
+    # print(np.shape(sum_sq_err_mat))
+    # print(sum_sq_err_mat)
+
+    min_sum_sq_err_ind = np.flatnonzero(sum_sq_err_mat == sum_sq_err_mat.min())
+    # print(type(min_sum_sq_err_ind))
+    # print()
+    # print(min_sum_sq_err_ind)
+
+    # test_arr = np.asarray([1])
+    #
+    # if len(test_arr) > 0:
+    #     print(str(True))
+    # else:
+    #     print(str(False))
+
+    net_charge_mat = np.matmul(nmol_design_mat, np.reshape(np.asarray(solute_charges + solvent_charges), (len(solute_charges + solvent_charges), -1)))
+    print(np.shape(net_charge_mat))
+    print(net_charge_mat)
+
+    zero_net_charge_ind = np.flatnonzero(net_charge_mat == 0)
+    print(zero_net_charge_ind)
+    zero_net_charge = net_charge_mat[list(zero_net_charge_ind)]
+    print(np.shape(zero_net_charge))
+    zero_net_charge_err = sum_sq_err_mat[list(zero_net_charge_ind)]
+    print(np.shape(zero_net_charge_err))
+    print(zero_net_charge_err)
+
+    min_err_ind = np.argmin(zero_net_charge_err)
+    print(min_err_ind)
+
+    print(design_mat[zero_net_charge_ind])
+    print(nmol_design_mat[zero_net_charge_ind])
+
+    lam = 1
+
+    sq_coeff_mat = np.square(design_mat)
+    print(sq_coeff_mat[zero_net_charge_ind])
+
+    ridge_term_mat = np.sum(np.multiply(sq_coeff_mat, lam), axis=1)
+    print(ridge_term_mat[zero_net_charge_ind])
+
+    loss_func_zero_mat = np.add(zero_net_charge_err, ridge_term_mat[zero_net_charge_ind])
+    print(loss_func_zero_mat)
+
+    print(conc_mat[zero_net_charge_ind])
+
+    ratio_set_vals =  np.reshape(np.divide(np.asarray([i["Final Molarity"] for i in solute_list]), solute_list[0]["Final Molarity"]), (-1, len(solute_list)))
+    print(ratio_set_vals)
+
+    ratio_val_mat = np.divide(nmol_design_mat, np.repeat(np.reshape(nmol_design_mat[:, 0], (np.shape(nmol_design_mat)[0], 1)), np.shape(nmol_design_mat)[1], axis=1))
+    print(ratio_val_mat[zero_net_charge_ind])
+
+    ratio_set_val_mat = np.repeat(ratio_set_vals, np.shape(ratio_val_mat)[0], axis=0)
+    print(np.shape(ratio_set_val_mat))
+    print(ratio_set_val_mat[zero_net_charge_ind])
+    ratio_err_mat = np.subtract(ratio_val_mat[:, :len(solute_list)], ratio_set_val_mat)
+    print(ratio_err_mat[zero_net_charge_ind])
+
+    sq_ratio_err_mat = np.square(ratio_err_mat)
+    print(sq_ratio_err_mat[zero_net_charge_ind])
+    sum_sq_ratio_err = np.sum(sq_ratio_err_mat, axis=1)
+    print(sum_sq_ratio_err[zero_net_charge_ind])
+
+    tri_loss_func_zero = np.add(loss_func_zero_mat, sum_sq_ratio_err[zero_net_charge_ind])
+    print(tri_loss_func_zero)
+    final_ind = np.flatnonzero(tri_loss_func_zero == tri_loss_func_zero.min())
+    print(final_ind)
+    final_nmol_zeros = nmol_design_mat[zero_net_charge_ind]
+    print(final_nmol_zeros[final_ind])
+
+    def Check_Sys_Charge(n_mols, volume, solute_list, solvent_list, max_change = 5, lambdas = [1, 1, 1]):
+        """"""
+        solute_charges = [i["Charge"] for i in solute_list]
+        solvent_charges = [i["Charge"] for i in solvent_list]
+        charges = solute_charges + solvent_charges
+
+        sys_charge = np.sum(np.multiply(n_mols, charges))
+
+        if sys_charge == 0:
+            return n_mols, sys_charge
+
+        # # Check all arrangements of changing number of molecules for each species
+        # # up to max_change.
+        # Create matrix whose rows contain all such arrangements: design_mat.
+        raw_design_vals = np.reshape(np.arange(-1 * max_change, 1 + max_change, 1), (-1, 2 * max_change + 1))
+        full_fact_dict = dict(zip(np.arange(0, len(charges), 1), np.repeat(raw_design_vals, len(charges), axis=0)))
+        raw_design_mat = build.full_fact(full_fact_dict).values
+        nmol_mat = np.repeat(np.reshape(np.asarray(n_mols), (-1, len(n_mols))), np.shape(raw_design_mat)[0], axis=0)
+        design_mat = np.add(raw_design_mat, nmol_mat)
+
+        # calculate sum of squared errors relating to concentration for each arrangement
+        set_conc = np.reshape(np.asarray([i["Final Molarity"] for i in solute_list]), (-1, len(solute_list)))
+        set_conc_mat = np.repeat(set_conc, np.shape(design_mat)[0], axis=0)
+        conc_const = 1 / AVOGADRO / volume * (10 ** 30) / (10 ** 3)
+        design_conc_mat = np.multiply(design_mat, conc_const)
+        conc_err_mat = np.subtract(design_conc_mat[:, :len(solute_list)], set_conc_mat)
+        conc_sq_err_mat = np.square(conc_err_mat)
+        conc_sum_sq_err = np.multiply(np.sum(conc_sq_err_mat, axis=1), lambdas[0])
+
+        # calculate penalty for the size of change of molecules for each arrangement
+        size_sq_mat = np.square(raw_design_mat)
+        size_sum_sq = np.multiply(np.sum(size_sq_mat, axis=1), lambdas[1])
+
+        # calculate sum of squared errors relating to the ratio to first solute for each arrangement
+        set_ratio = np.divide(set_conc, set_conc[0, 0])
+        set_ratio_mat = np.repeat(set_ratio, np.shape(design_mat)[0], axis=0)
+        design_ratio_mat = np.divide(design_mat[:, : len(solute_list)], np.repeat(np.reshape(design_mat[:, 0], (len(design_mat), 1)), len(solute_list), axis=1))
+        ratio_err_mat = np.subtract(design_ratio_mat, set_ratio_mat)
+        ratio_sq_err_mat = np.square(ratio_err_mat)
+        ratio_sum_sq_err = np.multiply(np.sum(ratio_sq_err_mat, axis=1), lambdas[2])
+
+        # calculate loss function for each arangement
+        loss_func = np.add(np.add(conc_sum_sq_err, size_sum_sq), ratio_sum_sq_err)
+
+        # get indices of arrangements that yield 0 net charge
+        mol_charges = np.repeat(np.reshape(np.asarray(charges), (-1, len(charges))), np.shape(design_mat)[0], axis=0)
+        design_charges_mat = np.multiply(design_mat, mol_charges)
+        design_charges = np.sum(design_charges_mat, axis=1)
+        zero_charge_ind = np.flatnonzero(design_charges == 0)
+        if len(zero_charge_ind) == 0:
+            return n_mols, sys_charge
+
+        # take minimum value of loss function of arrangement that yields 0 net charge
+        loss_func_zero = loss_func[zero_charge_ind]
+        loss_func_zero_min_ind = np.flatnonzero(loss_func_zero == loss_func_zero.min())
+        design_mat_zero = design_mat[zero_charge_ind]
+        n_mols_opt = design_mat_zero[loss_func_zero_min_ind]
+        return n_mols_opt, 0
+
+
+    new_nmols, new_sys_charge = Check_Sys_Charge(nmols_fin, box_volume, solute_list, solvent_list, max_change=5)
+
+    print(new_nmols)
+    print(new_sys_charge)
+
+
