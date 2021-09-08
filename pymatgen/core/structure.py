@@ -4330,6 +4330,121 @@ class Molecule(IMolecule, collections.abc.MutableSequence):
         final_mol = Molecule.from_sites(all_sites)
         return final_mol
 
+    def link_dummy_atom(self, atom_smiles, index, bond_order=1):
+        """
+        Connects a dummy atom to a Molecule at a specific site and rearranges the
+        order of species in the final Molecule so that the dummy site and the site
+        connected to it come at first. Meant to be a preparatory step for the
+        substitute method.
+        Args:
+            atom_smiles: SMILES representation of the atom to connect to; this is
+            replaced at the end with a dummy atom
+            index (int): Index of atom to connect to
+            bond_order (int): Bond order to calculate the bond length between
+            the molecule and the dummy atom. Defaults to 1.
+
+        Returns:
+            Connected structure.
+
+        """
+        # Create a Molecule from the atom
+        atom = Molecule.from_str(atom_smiles, fmt="smiles")
+
+        # Find the bond length between the connecting atoms.
+        bl = get_bond_length(self[index].specie, atom[0].specie,
+                             bond_order=bond_order)
+
+        # Get a vector representation of each molecule and find the angle
+        # between the two vectors.
+        v1 = [0, 0, 0]
+        v2 = [1, 1, 1]
+        for i, j in enumerate(self.species):
+            v1 += self[index].coords - self[i].coords
+
+        angle = get_angle(v1, v2)
+        # Make sure the angle between the two vectors is 180 to avoid having
+        # overlapping atoms.
+        if angle <= 179:
+            axis = np.cross(v1, v2)
+            op = SymmOp.from_origin_axis_angle(atom[0].coords, axis,
+                                               180 - angle)
+            atom.apply_operation(op)
+
+        # Align the second molecule to the bonding atom in the first molecule
+        # and translate the second molecule so that the bond length is achieved
+        atom.translate_sites(list(range(len(atom))),
+                              self[index].coords - atom[0].coords)
+        atom.translate_sites(list(range(len(atom))), float(bl) *
+                            v1/np.linalg.norm(v1))
+
+        atom_copy = deepcopy(atom)
+        # Create a new molecule using the existing sites in each molecule
+        axis_1 = v1.copy()
+        axis_2 = v2.copy()
+        final_mol = None
+        max_dist = 0
+        best_i = None
+        best_j = None
+        for i in range(0, 360, 5):
+            for j in range(0, 360, 5):
+                op_1 = SymmOp.from_origin_axis_angle(self[index].coords, axis_1, i)
+                op_2 = SymmOp.from_origin_axis_angle(self[index].coords, axis_2, j)
+                atom_copy.apply_operation(op_1)
+                atom_copy.apply_operation(op_2)
+                distances = [np.linalg.norm(atom_copy[0].coords - i.coords) for i in self if i != self[index]]
+                min_dist = min(distances)
+                if min_dist > max_dist:
+                    best_i = i
+                    best_j = j
+                    max_dist = min_dist
+                # raise Exception
+        op_1 = SymmOp.from_origin_axis_angle(self[index].coords, axis_1, best_i)
+        op_2 = SymmOp.from_origin_axis_angle(self[index].coords, axis_2, best_j)
+        atom.apply_operation(op_1)
+        atom.apply_operation(op_2)
+        all_sites = [site for site in self]
+        all_sites += [site for site in atom]
+        final_mol = Molecule.from_sites(all_sites)
+
+        # Replace atom with a dummy atom
+        final_mol[-1].species = "X"
+
+        # Rearrange species order so that the dummy atom and the atom that will be
+        # later connected to another molecules come at the first
+        if index != 0:
+            final_mol[0], final_mol[1], final_mol[-1], final_mol[index] = \
+                final_mol[-1], final_mol[index], final_mol[0], final_mol[1]
+        else:
+            final_mol[0], final_mol[1], final_mol[-1] = \
+                final_mol[-1], final_mol[index], final_mol[1]
+        return final_mol
+
+    def link_molecules(self, mol, indexes, bond_orders=[1, 1, 1],
+                       dummy_atoms=["[Br]", "[Br]"]):
+        """
+        Link two molecules by connecting one site from the first molecule
+        to another site from the second molecule. First attach a dummy atom to
+        each molecule at the binding sites, then use the substitute method to link
+        the two molecules.
+        Args:
+            mol: Molecule to connect to
+            indexes (list): Index of atom to connect to in each molecule
+            bond_orders (list): Bond order to calculate the bond length between
+            each molecule and the dummy atom and between the final molecules.
+            Defaults to [1, 1, 1].
+            dummy_atoms (list): SMILES representation of the atoms to attach to each
+            molecule. Are later replaced with actual Dummy atoms.
+            Defaults to ["[Br]", "[Br]"].
+
+        Returns:
+            Connected structure.
+
+        """
+        mol_1 = self.link_dummy_atom(dummy_atoms[0], indexes[0], bond_orders[0])
+        mol_2 = mol.link_dummy_atom(dummy_atoms[1], indexes[1], bond_orders[1])
+        mol_1.substitute(0, mol_2, bond_orders[2])
+        return mol_1
+
 
 class StructureError(Exception):
     """
