@@ -4155,81 +4155,6 @@ class Molecule(IMolecule, collections.abc.MutableSequence):
         for site in func_grp[1:]:
             self._sites.append(site)
 
-    # def link(self, mol, index, index_mol, bond_order=1):
-    #     """
-    #     Link two molecules by connecting one site from the first molecule
-    #     to another site from the second molecule.
-    #     Args:
-    #         mol: Molecule to connect to
-    #         index (int): Index of atom to connect to
-    #         index_mol (int): Index of atom in mol to connect to
-    #         bond_order (int): Bond order to calculate the bond length between
-    #         the connected molecule and the original molecule. Defaults to 1.
-    #
-    #     Returns:
-    #         Connected structure.
-    #
-    #     """
-    #     # Find the bond length between the connecting atoms.
-    #     bl = get_bond_length(self[index].specie, mol[index_mol].specie,
-    #                          bond_order=bond_order)
-    #
-    #     # Get a vector representation of each molecule and find the angle
-    #     # between the two vectors.
-    #     v1 = [0, 0, 0]
-    #     v2 = [1, 1, 1]
-    #     for i, j in enumerate(self.species):
-    #         v1 += self[index].coords - self[i].coords
-    #     for i, j in enumerate(mol.species):
-    #         v2 += mol[index_mol].coords - mol[i].coords
-    #
-    #     angle = get_angle(v1, v2)
-    #     # Make sure the angle between the two vectors is 180 to avoid having
-    #     # overlapping atoms.
-    #     if angle <= 179:
-    #         axis = np.cross(v1, v2)
-    #         op = SymmOp.from_origin_axis_angle(mol[index_mol].coords, axis,
-    #                                            180 - angle)
-    #         mol.apply_operation(op)
-    #
-    #     # Align the second molecule to the bonding atom in the first molecule
-    #     # and translate the second molecule so that the bond length is achieved
-    #     mol.translate_sites(list(range(len(mol))),
-    #                         self[index].coords - mol[index_mol].coords)
-    #     mol.translate_sites(list(range(len(mol))), float(bl) *
-    #                         v1/np.linalg.norm(v1))
-    #
-    #     mol_copy = deepcopy(mol)
-    #     # Create a new molecule using the existing sites in each molecule
-    #     axis_1 = v1.copy()
-    #     axis_2 = v2.copy()
-    #     final_mol = None
-    #     max_dist = 0
-    #     best_i = None
-    #     best_j = None
-    #     for i in range(0, 360, 5):
-    #         for j in range(0, 360, 5):
-    #             op_1 = SymmOp.from_origin_axis_angle(self[index].coords, axis_1, i)
-    #             op_2 = SymmOp.from_origin_axis_angle(self[index].coords, axis_2, j)
-    #             mol_copy.apply_operation(op_1)
-    #             mol_copy.apply_operation(op_2)
-    #             distances = [np.linalg.norm(mol_copy[index_mol].coords - i.coords) for i in self if i != self[index]]
-    #             min_dist = min(distances)
-    #             if min_dist > max_dist:
-    #                 best_i = i
-    #                 best_j = j
-    #                 max_dist = min_dist
-    #             # raise Exception
-    #     op_1 = SymmOp.from_origin_axis_angle(self[index].coords, axis_1, best_i)
-    #     op_2 = SymmOp.from_origin_axis_angle(self[index].coords, axis_2, best_j)
-    #     mol.apply_operation(op_1)
-    #     mol.apply_operation(op_2)
-    #     all_sites = [site for site in self]
-    #     all_sites += [site for site in mol]
-    #     final_mol = Molecule.from_sites(all_sites)
-    #     return final_mol
-
-
     def link(self, mol, index, index_mol, bond_order=1):
         """
         Link two molecules by connecting one site from the first molecule
@@ -4280,7 +4205,6 @@ class Molecule(IMolecule, collections.abc.MutableSequence):
         axis_1 = v2.copy()
         axis_2 = [-v2[1], v2[0], 0]
         axis_3 = np.cross(axis_1, axis_2)
-        final_mol = None
         max_dist = -sys.maxsize
         best_alpha = None
         best_beta = None
