@@ -1890,7 +1890,9 @@ class LammpsDataWrapper:
         """
         nmol_dict = self.nmol_dict
 
-        # Create list of min and max xyz coords
+        # # Create list of min and max xyz coords
+        self.xyz_low = [bound[0] for bound in self._initial_lammps_box.as_dict()['bounds']]
+        self.xyz_high = [bound[1] for bound in self._initial_lammps_box.as_dict()['bounds']]
         box_xyz = self.xyz_low + self.xyz_high
 
         # make packmol input list preserving the order of SortedNames
