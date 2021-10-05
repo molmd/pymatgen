@@ -29,7 +29,7 @@ __email__ = 'mbliss01@tufts.edu'
 __date__ = '1/29/20'
 
 
-Gaff_dict = {'c': '12.01', 'c1': '12.01', 'c2': '12.01', 'c3': '12.01', 'ca': '12.01', 'cp': '12.01', 'cq': '12.01',
+GAFF_DICT = {'c': '12.01', 'c1': '12.01', 'c2': '12.01', 'c3': '12.01', 'ca': '12.01', 'cp': '12.01', 'cq': '12.01',
              'cc': '12.01', 'cd': '12.01', 'ce': '12.01', 'cf': '12.01', 'cg': '12.01', 'ch': '12.01', 'cx': '12.01',
              'cy': '12.01', 'cu': '12.01', 'cv': '12.01', 'cz': '12.01', 'h1': '1.008', 'h2': '1.008', 'h3': '1.008',
              'h4': '1.008', 'h5': '1.008', 'ha': '1.008', 'hc': '1.008', 'hn': '1.008', 'ho': '1.008', 'hp': '1.008',
@@ -191,7 +191,7 @@ class AntechamberRunner(object):
 
 
 def get_bond_param(amberparm,ff_label):
-    '''
+    """
     Reads bond force field parameters and outputs list of dictionaries in proper format for instantiating PyMatGen ForceField object.
     Removes duplicate bond parameters even when atom order is reversed.
 
@@ -204,7 +204,7 @@ def get_bond_param(amberparm,ff_label):
 
     :return ff_bond_types: (list)  List of Dicts containing the bond force field parameters for the molecule in the proper format
         for the PyMatGen ForceField object.
-    '''
+    """
     ff_bond_types = []
     for bond in amberparm.bonds:
         add_bond = True
@@ -222,7 +222,7 @@ def get_bond_param(amberparm,ff_label):
     return ff_bond_types
 
 def get_angle_param(amberparm,ff_label):
-    '''
+    """
     Reads angle force field parameters and outputs list of Dicts that can be used for creating PyMatGen ForceField object.
     Similar to get_bond_param() function.
 
@@ -235,7 +235,7 @@ def get_angle_param(amberparm,ff_label):
 
     :return ff_bond_types: (list)  List of Dicts containing the angle force field parameters for the molecule in the proper format
         for the PyMatGen ForceField object.
-    '''
+    """
     ff_angle_types = []
     for angle in amberparm.angles:
         add_angle = True
@@ -254,7 +254,7 @@ def get_angle_param(amberparm,ff_label):
     return ff_angle_types
 
 def get_dihedral_param(amberparm,ff_label):
-    '''
+    """
     Reads dihedral force field parameters and outputs list of Dicts that can be used for creating PyMatGen ForceField objects.
     Similar to get_bond_param() function. Removes duplicate proper dihedrals even when bond order is reversed. Removes duplicate
     improper dihedrals without reversing bond order.
@@ -267,7 +267,7 @@ def get_dihedral_param(amberparm,ff_label):
 
     :return (ff_dihedral_types,ff_improper_types): (tuple) contains two lists of Dicts containing the proper dihedral and improper
         dihedral force field parameters for the molecule, respectively, in the proper format for the PyMatGen ForceField object.
-    '''
+    """
     ff_dihedral_types = []
     ff_improper_types = []
     for dihedral in amberparm.dihedrals:
@@ -303,13 +303,13 @@ def get_dihedral_param(amberparm,ff_label):
     return (ff_dihedral_types,ff_improper_types)
 
 def make_ff_bonded_type_list(types_dict, mol_name=''):
-    '''
+    """
     Makes list for use as value in topo_coeffs input when instantiating PyMatGen ForceField object.
     Should work for bond, angle, dihedral, and improper parameters.
     :param types_dict [dict]: keys are ff parameters, values are sets of tuples of atom types involved. Intended to be obtained from OTHER_FUNCTION
     :param mol_name [str]: molecule name to use for making ff_labels (see PyMatGen Topology object)
     :return: list of dictionaries containing bonded coefficients and atom types involved
-    '''
+    """
     bonded_type = []
     for params in types_dict.keys():
         bonded_type.append({'coeffs': [param for param in params], 'types': []})
@@ -318,8 +318,8 @@ def make_ff_bonded_type_list(types_dict, mol_name=''):
             bonded_type[-1]['types'].append(tuple(atom_labels))
     return bonded_type
 
-def get_nonbond_param(amberparm,molecule_name):
-    '''
+def get_nonbond_param(amberparm, molecule_name):
+    """
     Reads mass and LJ parameters from the parmed.amberparm object and stores in the format required by the
         pymatgen.ForceField object.
     :param amberparm: (parmed.amber._amberparm.AmberParm) Recommended to get from parmed.load_file(filename.prmtop) method.
@@ -327,19 +327,19 @@ def get_nonbond_param(amberparm,molecule_name):
     :param molecule_name: (str) molecule name to use for making ff_labels (see PyMatGen Topology object)
     :return: tuple of OrderedDict and list of lists. The OrderedDict contains the atom labels as keys and the masses as values.
         The list of lists contains LJ parameters that correspond to the ordering of the keys in the OrderedDict.
-    '''
-    Masses_ordered_dict = OrderedDict()
-    Nonbond_param_list = []
-    Label_list = [type + molecule_name for type in amberparm.LJ_types.keys()]
-    for type in Label_list:
-        Masses_ordered_dict[type] = float(Gaff_dict[type[:-len(molecule_name)]])
-    for type in Label_list:
+    """
+    masses_ordered_dict = OrderedDict()
+    nonbond_param_list = []
+    label_list = [type + molecule_name for type in amberparm.LJ_types.keys()]
+    for type in label_list:
+        masses_ordered_dict[type] = float(GAFF_DICT[type[:-len(molecule_name)]])
+    for type in label_list:
         index = amberparm.LJ_types[type[:-len(molecule_name)]] - 1
-        Nonbond_param_list.append([amberparm.LJ_depth[index],amberparm.LJ_radius[index] * 2 ** (5/6)])
-    return Masses_ordered_dict, Nonbond_param_list
+        nonbond_param_list.append([amberparm.LJ_depth[index],amberparm.LJ_radius[index] * 2 ** (5/6)])
+    return masses_ordered_dict, nonbond_param_list
 
 def check_partial_charge_sum(partial_charges, net_charge=0, tolerance=10**-16):
-    '''
+    """
     Compares the sum of the partial charges of atoms in a molecule to the net charge of the molecule.
     If the sum is not close to zero (within the tolerance), then all partial charges are shifted by the
     same amount such that the new sum of partial charges is within the tolerance of the net charge.
@@ -347,18 +347,18 @@ def check_partial_charge_sum(partial_charges, net_charge=0, tolerance=10**-16):
     :param net_charge: [int] the net charge of the molecule; defaults to 0
     :param tolerance: [float] the desired tolerance for the difference; defaults to 10**-16
     :return p_charges_array: [np.array] the new partial charges such that the difference is within the tolerance
-    '''
+    """
     p_charges_array = np.asarray(partial_charges)
     charge_difference = net_charge - np.sum(partial_charges)
     correction = charge_difference / len(partial_charges)
     if charge_difference > tolerance:
         p_charges_array += correction
     elif charge_difference < -tolerance:
-        p_charges_array -= correction
+        p_charges_array += correction
     return p_charges_array
 
 def prmtop_to_python(file_name, pmg_molecule, ff_label, tolerance=10**-16):
-    '''
+    """
     Extracts relevant parameters from *.prmtop file containing single molecule from tleap and stores them
     in a dictionary. The partial charges are corrected such that their sum is within a tolerance of the net
     charge.
@@ -375,36 +375,37 @@ def prmtop_to_python(file_name, pmg_molecule, ff_label, tolerance=10**-16):
         'Angles': [{'coeffs': [k_1, theta_eq_1], 'types': [('atom_a' + ff_label, 'atom_b' + ff_label, 'atom_c' + ff_label), ...]}, ...],
         'Dihedrals': [{'coeffs': [phi_k_1, phase_1, per_1], 'types': [('atom_a' + ff_label, 'atom_b' + ff_label, 'atom_c' + ff_label, 'atom_d' + ff_label), ...]}, ...],
         'Impropers': [{'coeffs': [phi_k_1, phase_1, per_1], 'types': [('atom_a' + ff_label, 'atom_b' + ff_label, 'atom_c' + ff_label, 'atom_d' + ff_label), ...]}, ...],
-        'Charges': Array([charge_1, ...])
-    '''
-    Amberparm = pmd.load_file(file_name)
-    Bond_parm = get_bond_param(Amberparm, ff_label)
-    Angle_parm = get_angle_param(Amberparm, ff_label)
-    Dihedral_parm, Improper_parm = get_dihedral_param(Amberparm, ff_label)
-    Masses, Nonbond_parm = get_nonbond_param(Amberparm, ff_label)
-    Charges = np.asarray(Amberparm.parm_data[Amberparm.charge_flag])
-    Corrected_Charges = check_partial_charge_sum(Charges, pmg_molecule.charge, tolerance)
+        'Charges': [charge_1, ...]
+    """
+    amber_parm = pmd.load_file(file_name)
+    bond_parm = get_bond_param(amber_parm, ff_label)
+    angle_parm = get_angle_param(amber_parm, ff_label)
+    dihedral_parm, improper_parm = get_dihedral_param(amber_parm, ff_label)
+    masses, nonbond_parm = get_nonbond_param(amber_parm, ff_label)
+    charges = np.asarray(amber_parm.parm_data[amber_parm.charge_flag])
+    corrected_charges = list(check_partial_charge_sum(charges,
+                                                      pmg_molecule.charge,
+                                                      tolerance))
 
-    PyParm = {'Molecule': pmg_molecule,
-              'Masses': Masses,
-              'Nonbond': Nonbond_parm,
-              'Bonds': Bond_parm,
-              'Angles': Angle_parm,
-              'Dihedrals': Dihedral_parm,
-              'Impropers': Improper_parm,
-              'Charges': Corrected_Charges}
+    pyparm = {'Molecule': pmg_molecule,
+              'Masses': masses,
+              'Nonbond': nonbond_parm,
+              'Bonds': bond_parm,
+              'Angles': angle_parm,
+              'Dihedrals': dihedral_parm,
+              'Impropers': improper_parm,
+              'Charges': corrected_charges}
 
-    return PyParm
+    return pyparm
 
 
 class PrmtopParser:
-    '''
+    """
     Object for parsing information necessary for LammpsDataWrapper from *.prmtop files containing a single molecule
         using the ParmEd package.
-    '''
+    """
 
     def __init__(self,prmtop_file_name,pmg_molecule,unique_molecule_name,check_partial_charges=True,tolerance=10**-16):
-        ''''''
         self._prmtop_file_name = prmtop_file_name
         self._mol_name = unique_molecule_name
         self._molecule = pmg_molecule
@@ -415,90 +416,96 @@ class PrmtopParser:
 
 
     @property
-    def LabelTypeList(self):
-        '''
+    def label_type(self):
+        """
         List of force field labels for each atom in the molecule.
-        '''
-        Label_list = [type + self._mol_name for type in self._amberparm.LJ_types.keys()]
-        return Label_list
+        """
+        label_list = [type + self._mol_name for type in self._amberparm.LJ_types.keys()]
+        return label_list
 
     @property
-    def Masses(self):
-        '''
+    def masses(self):
+        """
         OrderedDict of Masses in the format of OrderedDict({'atom_label_a':mass_a,...}), where 'atom_label' is a string of
             amber atomtype concatenated with the unique_molecule_label.
-        '''
-        Masses_ordered_dict = OrderedDict()
-        for type in self.LabelTypeList:
-            Masses_ordered_dict[type] = float(Gaff_dict[type[:-len(self._mol_name)].lower()])
-        return Masses_ordered_dict
+        """
+        masses_ordered_dict = OrderedDict()
+        for type in self.label_type:
+            if self._mol_name:
+                masses_ordered_dict[type] = float(GAFF_DICT[type[:-len(self._mol_name)].lower()])
+            else:
+                masses_ordered_dict[type] = float(GAFF_DICT[type.lower()])
+        return masses_ordered_dict
 
 
     @property
-    def LJParam(self):
-        '''
+    def lj_param(self):
+        """
         List of lists for the Lennard Jones parameters in the format of [[epsilon_a, sigma_a],...].
         :return:
-        '''
-        LJ_param_list = []
-        for type in self.LabelTypeList:
-            index = self._amberparm.LJ_types[type[:-len(self._mol_name)]] - 1
-            LJ_param_list.append([self._amberparm.LJ_depth[index],self._amberparm.LJ_radius[index] * 2 ** (5/6)])
-        return LJ_param_list
+        """
+        lj_param_list = []
+        for type in self.label_type:
+            if self._mol_name:
+                index = self._amberparm.LJ_types[type[:-len(self._mol_name)]] - 1
+            else:
+                index = self._amberparm.LJ_types[type] - 1
+            lj_param_list.append([self._amberparm.LJ_depth[index],self._amberparm.LJ_radius[index] * 2 ** (5/6)])
+        return lj_param_list
 
 
     @property
-    def BondParam(self):
-        '''
+    def bond_param(self):
+        """
         List of dicts for the bond parameters in the format of [{'coeffs':coeffs_1,'types':[(i,j),...]},...].
             Automatically filters out any duplicates.
-        '''
-        Bond_param_list = []
+        """
+        bond_param_list = []
         for bond in self._amberparm.bonds:
             add_bond = True
             coeffs = [bond.type.k, bond.type.req]
             atom_types = (bond.atom1.type + self._mol_name,
                           bond.atom2.type + self._mol_name)
-            for old_type in Bond_param_list:
+            for old_type in bond_param_list:
                 if coeffs == old_type['coeffs']:
                     if atom_types not in old_type['types'] and atom_types[::-1] not in old_type['types']:
                         old_type['types'].append(atom_types)
                     add_bond = False
                     break
             if add_bond:
-                Bond_param_list.append({'coeffs':coeffs,'types':[atom_types]})
-        return Bond_param_list
+                bond_param_list.append({'coeffs':coeffs,'types':[atom_types]})
+        return bond_param_list
 
 
     @property
-    def AngleParam(self):
-        '''
+    def angle_param(self):
+        """
         List of dicts for the angle parameters in the format of [{'coeffs':coeffs_1,'types':[(i,j,k),...]},...].
-        '''
-        Angle_param_list = []
+        """
+        angle_param_list = []
         for angle in self._amberparm.angles:
             add_angle = True
             coeffs = [angle.type.k, angle.type.theteq]
             atom_types = (angle.atom1.type + self._mol_name,
                           angle.atom2.type + self._mol_name,
                           angle.atom3.type + self._mol_name)
-            for old_type in Angle_param_list:
+            for old_type in angle_param_list:
                 if coeffs == old_type['coeffs']:
                     if atom_types not in old_type['types'] and atom_types[::-1] not in old_type['types']:
                         old_type['types'].append(atom_types)
                     add_angle = False
                     break
             if add_angle:
-                Angle_param_list.append({'coeffs':coeffs,'types':[atom_types]})
-        return Angle_param_list
+                angle_param_list.append({'coeffs':coeffs,'types':[atom_types]})
+        return angle_param_list
 
 
     @property
-    def DihedralParam(self):
-        '''
+    def dihedral_para(self):
+        """
         List of dicts for the proper dihedral parameters in the format of [{'coeffs':coeffs_1,'types':[(i,j,k,l),...]},...].
-        '''
-        Dihedral_param_list = []
+        """
+        dihedral_param_list = []
         for index, dihedral in enumerate(self._amberparm.dihedrals):
             add_dihedral = True
             atom_types = (dihedral.atom1.type + self._mol_name,
@@ -512,23 +519,23 @@ class PrmtopParser:
             else:
                 raise ValueError('The phase of the dihedral at index ' + str(index) + ' was a value other than 0 or 180 mod(360).')
             if not dihedral.improper:
-                for old_d_type in Dihedral_param_list:
+                for old_d_type in dihedral_param_list:
                     if coeffs == old_d_type['coeffs']:
                         if atom_types not in old_d_type['types'] and atom_types[::-1] not in old_d_type['types']:
                             old_d_type['types'].append(atom_types)
                         add_dihedral = False
                         break
                 if add_dihedral:
-                    Dihedral_param_list.append({'coeffs':coeffs,'types':[atom_types]})
-        return Dihedral_param_list
+                    dihedral_param_list.append({'coeffs':coeffs,'types':[atom_types]})
+        return dihedral_param_list
 
 
     @property
-    def ImproperParam(self):
-        '''
+    def improper_param(self):
+        """
         List of dicts for the improper dihedral parameters in the format of [{'coeffs':coeffs_1,'types':[(i,j,k,l),...]},...].
-        '''
-        Improper_param_list = []
+        """
+        improper_param_list = []
         for index, dihedral in enumerate(self._amberparm.dihedrals):
             add_dihedral = True
             atom_types = (dihedral.atom1.type + self._mol_name,
@@ -542,69 +549,68 @@ class PrmtopParser:
             else:
                 raise ValueError('The phase of the dihedral at index ' + str(index) + ' was a value other than 0 or 180 mod(360).')
             if dihedral.improper:
-                for old_i_type in Improper_param_list:
+                for old_i_type in improper_param_list:
                     if coeffs == old_i_type['coeffs']:
                         if atom_types not in old_i_type['types']:
                             old_i_type['types'].append(atom_types)
                         add_dihedral = False
                         break
                 if add_dihedral:
-                    Improper_param_list.append({'coeffs':coeffs,'types':[atom_types]})
-        return Improper_param_list
+                    improper_param_list.append({'coeffs':coeffs,'types':[atom_types]})
+        return improper_param_list
 
 
     @property
-    def ImproperTopologies(self):
-        '''
+    def improper_topologies(self):
+        """
         List of lists for the improper topologies in the format of [[index_i,index_j,index_k,index_l],...].
         :return:
-        '''
+        """
         impropers = []
         for dihedral in self._amberparm.dihedrals:
             if dihedral.improper:
                 impropers.append(dihedral)
-        Improper_topology_list = []
+        improper_topology_list = []
         if impropers:
             for improper in impropers:
                 atom1_index = self._amberparm.atoms.index(improper.atom1)
                 atom2_index = self._amberparm.atoms.index(improper.atom2)
                 atom3_index = self._amberparm.atoms.index(improper.atom3)
                 atom4_index = self._amberparm.atoms.index(improper.atom4)
-                Improper_topology_list.append([atom1_index,atom2_index,atom3_index,atom4_index])
+                improper_topology_list.append([atom1_index,atom2_index,atom3_index,atom4_index])
         else:
-            Improper_topology_list = None
-        return Improper_topology_list
+            improper_topology_list = None
+        return improper_topology_list
 
 
     @property
-    def Charges(self):
-        '''
+    def charges(self):
+        """
         np.array of partial charges. Checks to make sure that the sum of the partial charges is within a tolerance of
             the net charge of the molecule.
         :return:
-        '''
-        Charges_array = np.asarray(self._amberparm.parm_data[self._amberparm.charge_flag])
+        """
+        charges_array = np.asarray(self._amberparm.parm_data[self._amberparm.charge_flag])
         if self._check_partial_charges:
-            charge_difference = self._molecule.charge - np.sum(Charges_array)
-            charge_correction = charge_difference / len(Charges_array)
+            charge_difference = self._molecule.charge - np.sum(charges_array)
+            charge_correction = charge_difference / len(charges_array)
             if charge_difference > self._tolerance:
-                Charges_array += charge_correction
+                charges_array += charge_correction
             elif charge_difference < -self._tolerance:
-                Charges_array -= charge_correction
-        return Charges_array
+                charges_array += charge_correction
+        return list(charges_array)
 
 
     def to_dict(self):
-        ''''''
-        Labels = [atom.type + self._mol_name for atom in self._amberparm.atoms]
-        Param_dict = {'Molecule':self._molecule,
-                      'Labels':Labels,
-                      'Masses':self.Masses,
-                      'Nonbond':self.LJParam,
-                      'Bonds':self.BondParam,
-                      'Angles':self.AngleParam,
-                      'Dihedrals':self.DihedralParam,
-                      'Impropers':self.ImproperParam,
-                      'Improper Topologies':self.ImproperTopologies,
-                      'Charges':self.Charges}
-        return Param_dict
+        labels = [atom.type + self._mol_name for atom in self._amberparm.atoms]
+        param_dict = {'Molecule':self._molecule,
+                      'Labels':labels,
+                      'Masses':self.masses,
+                      'Nonbond':self.lj_param,
+                      'Bonds':self.bond_param,
+                      'Angles':self.angle_param,
+                      'Dihedrals':self.dihedral_para,
+                      'Impropers':self.improper_param,
+                      'Improper Topologies':self.improper_topologies,
+                      'Charges':self.charges}
+        return param_dict
