@@ -12,9 +12,13 @@ import re
 import shutil
 import warnings
 from string import Template
+from tabulate import tabulate
 
+from monty.io import zopen
 from monty.json import MSONable
+from monty.os.path import zpath
 
+from pymatgen.util.string import str_delimited
 from pymatgen.io.lammps.data import LammpsData
 
 __author__ = "Kiran Mathew, Brandon Wood, Zhi Deng"
@@ -23,6 +27,8 @@ __version__ = "1.0"
 __maintainer__ = "Zhi Deng, Matthew Bliss"
 __email__ = "z4deng@eng.ucsd.edu, matthew.bliss@stonybrook.edu"
 __date__ = "Aug 1, 2018"
+
+COMMON_DUP_KEYWORDS = ["group", "fix", "compute", "unfix"]
 
 
 class LammpsRun(MSONable):
