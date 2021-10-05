@@ -1441,12 +1441,12 @@ def split_by_mol(n_atoms, n_mols, mix, low_ind=0, site_prop=None, molecules=[]):
     """
     upp_ind = low_ind + n_atoms
     for i in range(n_mols):
-        Sites = mix.sites[low_ind:upp_ind]
-        Mol = Molecule.from_sites(Sites)
+        sites = mix.sites[low_ind:upp_ind]
+        mol = Molecule.from_sites(sites)
         if site_prop:
             for key in site_prop.keys():
-                Mol.add_site_property(key, site_prop[key])
-        molecules.append(Mol)
+                mol.add_site_property(key, site_prop[key])
+        molecules.append(mol)
         low_ind += n_atoms
         upp_ind += n_atoms
     return molecules, low_ind
