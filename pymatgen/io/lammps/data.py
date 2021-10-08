@@ -27,6 +27,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from doepy import build
 from monty.dev import deprecated
 from monty.json import MSONable
 from monty.serialization import loadfn
