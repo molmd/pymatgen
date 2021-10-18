@@ -821,7 +821,7 @@ class GaussianOutput:
         """
         :returns: Initial structure in Gaussian output.
         """
-        return self.structures_input_orientation[0]
+        return self.structures_input_orientation[0] if self.structures_input_orientation else self.structures[0]
 
     @property
     def final_structure(self):
