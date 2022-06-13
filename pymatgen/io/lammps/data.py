@@ -424,6 +424,7 @@ class LammpsData(MSONable):
                                 **default_formatters,
                                 **coeffs[k][df.iloc[0]["coeff1"]],
                             }
+                            df = df.drop(labels="coeff1", axis=1)
                         except KeyError:
                             formatters = default_formatters
                         line_string = df.to_string(
@@ -1162,7 +1163,6 @@ class ForceField(MSONable):
 
         def process_data(data):
             df = pd.DataFrame(data)
-            assert self._is_valid(df), "Invalid coefficients with rows varying in length"
             n, c = df.shape
             df.columns = ["coeff%d" % i for i in range(1, c + 1)]
             df.index = range(1, n + 1)
