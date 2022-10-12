@@ -75,7 +75,7 @@ Dihedral Coeffs:
   cosine/shift/exp/omp: {coeff2: float_format, coeff3: float_format, coeff4: float_format}
   fourier: {coeff10: int_format, coeff11: float_format, coeff2: int_format, coeff3: float_format,
     coeff4: int_format, coeff5: float_format, coeff6: float_format, coeff7: int_format,
-    coeff8: float_format, coeff9: float_format}
+    coeff8: float_format, coeff9: float_format, coeff12: float_format, coeff13: int_format, coeff14: float_format}
   fourier/intel: {coeff10: int_format, coeff11: float_format, coeff2: int_format, coeff3: float_format,
     coeff4: int_format, coeff5: float_format, coeff6: float_format, coeff7: int_format,
     coeff8: float_format, coeff9: float_format}
