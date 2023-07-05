@@ -1195,7 +1195,7 @@ class GaussianOutput:
                     elif (not self.is_pcm) and pcm_patt.search(line):
                         self.is_pcm = True
                         self.pcm = {}
-                    elif "freq" in route_lower and "opt" in route_lower and stat_type_patt.search(line):
+                    elif "freq" in route_lower stat_type_patt.search(line):
                         self.stationary_type = "Saddle"
                     elif mp2_patt.search(line):
                         m = mp2_patt.search(line)
