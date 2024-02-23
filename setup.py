@@ -104,7 +104,7 @@ setup(
         "numpy>=1.20.1",
         "requests",
         "ruamel.yaml>=0.15.6",
-        "monty>=3.0.2",
+        "monty>=3.0.2,<=2023.5.8",
         "scipy>=1.5.0",
         "tabulate",
         "spglib>=1.9.9.44",
