@@ -115,6 +115,7 @@ setup(
         "pandas",
         "plotly>=4.5.0",
         "uncertainties>=3.1.4",
+        "doepy>=0.0.1",
     ],
     extras_require={
         "provenance": ["pybtex"],
