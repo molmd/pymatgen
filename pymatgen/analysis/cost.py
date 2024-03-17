@@ -19,7 +19,6 @@ from io import open
 
 import scipy.constants as const
 from monty.design_patterns import singleton
-from monty.string import unicode2str
 
 from pymatgen.core.composition import Composition
 from pymatgen.core.periodic_table import Element
@@ -100,7 +99,7 @@ class CostDBCSV(CostDB):
         self._chemsys_entries = defaultdict(list)
         filename = os.path.join(os.path.dirname(__file__), filename)
         with open(filename, "rt") as f:
-            reader = csv.reader(f, quotechar=unicode2str("|"))
+            reader = csv.reader(f, quotechar="|")
             for row in reader:
                 comp = Composition(row[0])
                 cost_per_mol = float(row[1]) * comp.weight.to("kg") * const.N_A

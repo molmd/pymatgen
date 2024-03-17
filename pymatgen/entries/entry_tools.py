@@ -19,7 +19,6 @@ import re
 from typing import Iterable, List, Set, Union
 
 from monty.json import MontyDecoder, MontyEncoder, MSONable
-from monty.string import unicode2str
 
 from pymatgen.analysis.phase_diagram import PDEntry
 from pymatgen.analysis.structure_matcher import SpeciesComparator, StructureMatcher
@@ -282,8 +281,8 @@ class EntrySet(collections.abc.MutableSet, MSONable):
         with open(filename, "w") as f:
             writer = csv.writer(
                 f,
-                delimiter=unicode2str(","),
-                quotechar=unicode2str('"'),
+                delimiter=",",
+                quotechar='"',
                 quoting=csv.QUOTE_MINIMAL,
             )
             writer.writerow(["Name"] + [el.symbol for el in elements] + ["Energy"])
@@ -307,8 +306,8 @@ class EntrySet(collections.abc.MutableSet, MSONable):
         with open(filename, "r", encoding="utf-8") as f:
             reader = csv.reader(
                 f,
-                delimiter=unicode2str(","),
-                quotechar=unicode2str('"'),
+                delimiter=",",
+                quotechar='"',
                 quoting=csv.QUOTE_MINIMAL,
             )
             entries = list()
