@@ -6,7 +6,7 @@ import os
 import unittest
 import warnings
 
-from monty.os.path import which
+from shutil import which
 
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.structure import Structure

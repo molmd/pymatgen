@@ -5,7 +5,7 @@
 import os
 import unittest
 
-from monty.os.path import which
+from shutil import which
 
 from pymatgen.analysis.magnetism import *
 from pymatgen.core import Element, Lattice, Species, Structure

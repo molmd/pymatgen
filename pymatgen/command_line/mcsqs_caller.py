@@ -6,13 +6,13 @@ https://www.brown.edu/Departments/Engineering/Labs/avdw/atat/
 import os
 import tempfile
 import warnings
+from shutil import which
 from pathlib import Path
 from subprocess import Popen, TimeoutExpired
 from collections import namedtuple
 from typing import Dict, List, Optional, Union
 
 from monty.dev import requires
-from monty.os.path import which
 
 from pymatgen.core.structure import Structure
 

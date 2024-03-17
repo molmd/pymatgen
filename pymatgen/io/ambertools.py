@@ -12,10 +12,10 @@ import subprocess
 import tempfile
 import numpy as np
 import parmed as pmd
+from shutil import which
 from collections import namedtuple, OrderedDict
 
 from monty.dev import requires
-from monty.os.path import which
 from monty.tempfile import ScratchDir
 
 from pymatgen.core.structure import Molecule

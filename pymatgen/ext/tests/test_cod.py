@@ -8,7 +8,7 @@ import warnings
 
 import requests
 
-from monty.os.path import which
+from shutil import which
 
 from pymatgen.ext.cod import COD
 

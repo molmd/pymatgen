@@ -7,10 +7,10 @@ import random
 import unittest
 import warnings
 from pathlib import Path
+from shutil import which
 
 import pytest  # type: ignore
 import numpy as np
-from monty.os.path import which
 
 from pymatgen.core.composition import Composition
 from pymatgen.core.lattice import Lattice

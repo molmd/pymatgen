@@ -12,7 +12,7 @@ import os
 import sys
 import unittest
 
-from monty.os.path import which
+from shutil import which
 
 from pymatgen.analysis.bond_valence import BVAnalyzer
 from pymatgen.command_line.gulp_caller import (

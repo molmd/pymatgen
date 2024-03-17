@@ -5,10 +5,10 @@ import os
 import unittest
 import warnings
 from math import pi
+from shutil import which
 
 import numpy as np
 import pytest
-from monty.os.path import which
 
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.lattice import Lattice

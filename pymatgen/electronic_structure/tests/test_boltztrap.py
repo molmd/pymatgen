@@ -8,7 +8,8 @@ import os
 import unittest
 import warnings
 
-from monty.os.path import which
+from shutil import which
+
 from monty.serialization import loadfn
 
 from pymatgen.electronic_structure.bandstructure import BandStructure

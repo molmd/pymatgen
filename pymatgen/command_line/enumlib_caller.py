@@ -36,11 +36,11 @@ import math
 import re
 import subprocess
 from threading import Timer
+from shutil import which
 
 import numpy as np
 from monty.dev import requires
 from monty.fractions import lcm
-from monty.os.path import which
 from monty.tempfile import ScratchDir
 
 from pymatgen.core.periodic_table import DummySpecies

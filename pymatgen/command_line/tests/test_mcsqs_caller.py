@@ -1,7 +1,8 @@
 import os
 import unittest
 
-from monty.os.path import which
+from shutil import which
+
 from monty.serialization import loadfn
 
 from pymatgen.core.structure import Structure

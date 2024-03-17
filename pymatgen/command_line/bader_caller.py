@@ -22,10 +22,11 @@ import shutil
 import subprocess
 import warnings
 
+from shutil import which
+
 import numpy as np
 from monty.dev import requires
 from monty.io import zopen
-from monty.os.path import which
 from monty.tempfile import ScratchDir
 
 from pymatgen.io.cube import Cube

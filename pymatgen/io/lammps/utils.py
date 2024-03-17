@@ -11,6 +11,7 @@ import os
 import tempfile
 from io import open
 from subprocess import PIPE, Popen
+from shutil import which
 
 import numpy as np
 
@@ -19,7 +20,6 @@ try:
 except ImportError:
     pb = None
 
-from monty.os.path import which
 from monty.tempfile import ScratchDir
 
 from pymatgen.core.structure import Molecule

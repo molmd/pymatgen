@@ -4,7 +4,7 @@
 
 import unittest
 
-from monty.os.path import which
+from shutil import which
 
 from pymatgen.command_line.critic2_caller import *
 from pymatgen.core.structure import Structure
