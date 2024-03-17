@@ -10,6 +10,9 @@ import platform
 from setuptools import setup, find_namespace_packages, Extension
 from setuptools.command.build_ext import build_ext as _build_ext
 
+import site
+import sys
+site.ENABLE_USER_SITE = "--user" in sys.argv[1:]
 
 class build_ext(_build_ext):
     """Extension builder that checks for numpy before install."""
@@ -104,7 +107,7 @@ setup(
         "numpy>=1.20.1",
         "requests",
         "ruamel.yaml>=0.15.6",
-        "monty>=3.0.2,<=2023.5.8",
+        "monty>=3.0.2",
         "scipy>=1.5.0",
         "tabulate",
         "spglib>=1.9.9.44",
