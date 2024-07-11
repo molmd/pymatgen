@@ -734,6 +734,11 @@ class LammpsData(MSONable):
 
         """
         atom_types = set.union(*[t.species for t in topologies])
+        print(f"atom_types:\n{atom_types}\n")
+        print(f"ff object:\n{ff}\n")
+        print(f"ff.maps:\n{ff.maps}\n")
+        print(f"ff.maps['Atoms']:\n{ff.maps['Atoms']}\n")
+        print(f"ff.maps['Atoms'].keys():\n{ff.maps['Atoms'].keys()}\n")
         assert atom_types.issubset(ff.maps["Atoms"].keys()), "Unknown atom type found in topologies"
 
         items = dict(box=box, atom_style=atom_style, masses=ff.masses, force_field=ff.force_field)
@@ -1725,29 +1730,41 @@ class LammpsDataWrapper:
         length_increase=0.5,
         check_ff_duplicates=True,
         box_data_type="cubic",
+        system_molecule=None,
+        system_molecule_type=None,
+        sorted_mol_names=None,
     ):
         """
-        Low level constructor designed to work with lists of dictionaries that should
-        be able to be obtained from databases. Works for cubic boxes only using
-        real coordinates.
-        :param system_force_fields: [dict] Contains force field information using
-            the following format:
+        Low level constructor designed to work with lists of 
+        dictionaries that should be able to be obtained from databases. 
+        Works for cubic boxes only using real coordinates.
+        :param system_force_fields: [dict] Contains force field 
+            information using the following format:
             { unique_molecule_name: {
                 'Molecule': pymatgen.Molecule,
                 'Labels': [atom_a, ...]
                 'Masses': [OrderedDict({species_1: mass_1, ...})],
                 'Nonbond': [[...], ...],
-                'Bonds': [{'coeffs': [...], 'types': [(i, j), ...]}, ...],
-                'Angles': [{'coeffs': [...], 'types': [(i, j, k), ...]}, ...],
-                'Dihedrals': [{'coeffs': [...], 'types': [(i, j, k, l), ...]}, ...],
-                'Impropers': [{'coeffs': [...], 'types': [(i, j, k, l), ...]}, ...],
+                'Bonds': [
+                    {'coeffs': [...], 'types': [(i, j), ...]}, ...
+                ],
+                'Angles': [
+                    {'coeffs': [...], 'types': [(i, j, k), ...]}, ...
+                ],
+                'Dihedrals': [
+                    {'coeffs': [...], 'types': [(i, j, k, l), ...]}, ...
+                ],
+                'Impropers': [
+                    {'coeffs': [...], 'types': [(i, j, k, l), ...]}, ...
+                ],
                 'Improper Topologies': [[a, b, c, d],...]
                 'Charges': [atom_a, ...]
             }, ...}
-        :param system_mixture_data: [dict] Format depends on mixture_data_type input.
-            For mixture_data_type = 'concentration', this parameter contains molarity,
-            density, and molar weights of solutes and solvents using the
-            following format:
+        :param system_mixture_data: [dict] Format depends on 
+            mixture_data_type input.
+            For mixture_data_type = 'concentration', this parameter 
+            contains molarity, density, and molar weights of solutes and
+            solvents using the following format:
             {
                 'Solutes': {unique_molecule_name: {
                                 'Initial Molarity': molarity_1i,
@@ -1762,22 +1779,84 @@ class LammpsDataWrapper:
                                 'Molar Weight': molar_weight_1
                             }, ...}
             }
-            For mixture_data_type = 'number of molecules', this parameter contains
-            the number of molecules for each species in the system in the following
-            format:
+            For mixture_data_type = 'number of molecules', this 
+            parameter contains the number of molecules for each species 
+            in the system in the following format:
             {
                 unique_molecule_name: n_mols,
                 ...
             }
-        :param mixture_data_type: [str] controls the format of the system_mixture_data
-            parameter. Currently supports values of 'concentration' and
-            'number of molecules'. Defaults to "concentration".
-        :param cube_length: [float] length of system box in angstroms.
-        :param origin: [list] Optional. Change if the minimum xyz coordinates for
-            desired box are not [0,0,0].
+        :param box_data: [float, 3x2 array_like, LammpsBox] This 
+            parameter controls the dimensions of the system box. The 
+            format depends on the value of box_data_type.
+            For box_data_type = 'cubic', this parameter is a float and
+            sets the length of the cubic box.
+            For box_data_type = 'rectangular', this parameter is a 3x2
+            array_like and sets the bounds of the rectangular box.
+            For box_data_type = 'LammpsBox', this parameter is a pmg
+            LammpsBox object and sets the bounds of the box.
+        :param mixture_data_type: [str] controls the format of the 
+            system_mixture_data parameter. Currently supports values of 
+            'concentration', 'number of molecules', 'pmg molecule', and 
+            'xyz'. Defaults to "concentration".
+        :param origin: [1x3 array_like] Optional. Change if the minimum 
+            xyz coordinates for desired box are not [0,0,0].
         :param seed: [int] Optional. Sets the seed for running packmol.
-        :param packmolrunner_inputs: [dict] Optional. Parameters for PackmolRunner
-            in pymatgen.io.lammps.utils
+            This parameter will update the 'seed' key in the
+            packmolrunner_inputs parameter. Defaults to 150.
+        :param packmolrunner_inputs: [dict] Optional. Parameters for 
+            PackmolRunner in pymatgen.io.lammps.utils
+        :param length_increase: [float] Optional. Because packmol will 
+            not always strictly adhere to the box dimensions, this
+            parameter sets the amount to increase the box dimensions by
+            in order to ensure that all molecules are within the box. It
+            will increase the length of the box by this amount in the x,
+            y, and z directions. In effect, it will decrease the min box
+            value by half of its value and increase the max box value by
+            half of its value Defaults to 0.5. This means that the min 
+            values of x, y, and z will be decreased by 0.25 and the max 
+            values of x, y, and z will be increased by 0.25 by default.
+            If using the default value, it might be advisable to set the 
+            origin to [0.25, 0.25, 0.25] to ensure that the true box 
+            origin is at [0,0,0].
+        :param check_ff_duplicates: [bool] Optional. If True, the angle,
+            dihedral, and improper bond types will be checked for 
+            duplicates (eg, for angles, the following two types are 
+            duplicates: ("C", "O", "H") and ("H", "O", "C")). If 
+            duplicates are found, a warning will be issued. Defaults to 
+            True.
+        :param box_data_type: [str] Optional. Controls the format of the
+            box_data parameter. Currently supports values of 'cubic', 
+            'rectangular', and 'LammpsBox'. Defaults to "cubic".
+        :param system_molecule: [pmg Molecule, str] Optional. If
+            mixture_data_type is 'pmg molecule', this parameter should
+            contain a pmg Molecule object containing all of the 
+            molecules in the system. The order of the molecules in this 
+            object should be similar to that created by the 
+            PackmolRunner object. That is, all sites belonging to the 
+            first molecule should be listed first, then all sites 
+            belonging to the second molecule, and so on. Also, the sites
+            belonging to each molecular species should be sorted such 
+            that all the sites belonging to the first molecular species
+            occur first, then all the sites belonging to the second
+            molecular species, and so on.
+            If mixture_data_type is 'xyz', this parameter should contain
+            a path to an xyz file containing the coordinates of all the
+            molecules in the system. The order of the molecules in this
+            file should be similar to the xyz file created by the
+            PackmolRunner object, and by extension, the 'pmg molecule'
+            version of this parameter.
+            If this parameter is used, then the system_mixture_data 
+            should be the number of molecules in the system.
+            If None, the system molecule will be created from packmol 
+            based on the system_mixture_data. Defaults to None.
+        :param system_molecule_type: [str] Optional. controls the format
+            of the system_molecule parameter. Currently supports values 
+            of 'pmg molecule' and 'xyz'. Defaults to None.
+        :param sorted_mol_names: [list] Optional. Contains the unique
+            molecule names in the system. If None, the molecule names 
+            will be sorted from most to least number of atoms. Defaults 
+            to None.
         """
         self._ff_list = system_force_fields
         self._concentration_data = False
@@ -1797,17 +1876,18 @@ class LammpsDataWrapper:
         elif mixture_data_type == "number of molecules":
             self._number_of_molecules_data = True
             self._n_mol_dict = system_mixture_data
-
+        
+        self._origin = origin
         if box_data_type == "cubic":
             self.length = box_data
-            self._initial_lammps_box = LammpsBox([[0.0, box_data],
-                                                  [0.0, box_data],
-                                                  [0.0, box_data]])
+            self._initial_lammps_box = LammpsBox([[self._origin[0], box_data],
+                                                  [self._origin[1], box_data],
+                                                  [self._origin[2], box_data]])
         elif box_data_type == "rectangular":
             self._initial_lammps_box = LammpsBox(box_data)
         elif box_data_type == "LammpsBox":
             self._initial_lammps_box = box_data
-        self._origin = origin
+        
 
         packmolrunner_inputs["control_params"]["seed"] = seed
         self._packmolrunner_inputs = packmolrunner_inputs
@@ -1818,19 +1898,48 @@ class LammpsDataWrapper:
         self._length_increase = length_increase
         self._check_ff_duplicates = check_ff_duplicates
 
+        if system_molecule_type is None:
+            self._packmol_run_status = True
+        elif system_molecule_type in ["pmg molecule", "xyz"]:
+            self._packmol_run_status = False
+            if system_molecule_type == "xyz":
+                self._sys_molecule = Molecule.from_file(system_molecule)
+            else:
+                self._sys_molecule = system_molecule
+            if mixture_data_type != "number of molecules":
+                raise ValueError(
+                    "The system_molecule_type parameter is not valid. \
+                    Currently, the only valid value for this parameter is \
+                    'number of molecules' if also using a system_molecule \
+                    parameter."
+                )
+        else:
+            raise ValueError(
+                "The system_molecule_type parameter is not valid. Currently, \
+                    the only valid values are 'pmg molecule' and 'xyz'."
+                )
+        
+        self._sorted_mol_names = sorted_mol_names
+
+
     @property
     def sorted_mol_names(self):
         """
-        Sorts molecules from most to least number of atoms
-        :return molecule_name_list: [list] Contains the unique_molecule_names
+        Sorts molecules from most to least number of atoms. Only used if
+        sorted_mol_names is None.
+        :return molecule_name_list: [list] Contains the 
+            unique_molecule_names
         """
-        molecule_name_list = list(self._ff_list.keys())
-        molecule_natoms_list = [len(self._ff_list[name]["Molecule"]) for
-                                name in molecule_name_list]
-        molecule_name_list.sort(key=dict(zip(molecule_name_list,
-                                             molecule_natoms_list)).get,
-                                reverse=True)
-        return molecule_name_list
+        if self._sorted_mol_names is not None:
+            return self._sorted_mol_names
+        else:
+            molecule_name_list = list(self._ff_list.keys())
+            molecule_natoms_list = [len(self._ff_list[name]["Molecule"]) for
+                                    name in molecule_name_list]
+            molecule_name_list.sort(key=dict(zip(molecule_name_list,
+                                                molecule_natoms_list)).get,
+                                    reverse=True)
+            return molecule_name_list
 
     @property
     def nmol_dict(self):
@@ -2072,7 +2181,10 @@ class LammpsDataWrapper:
         return mix_lmpbox
 
     def build_lammps_data(self, atom_style="full"):
-        system_molecule = self._run_packmol()
+        if self._packmol_run_status:
+            system_molecule = self._run_packmol()
+        else:
+            system_molecule = self._sys_molecule
         system_topologies = self._get_topologies(system_molecule)
         system_lammps_box = self._get_lammps_box(system_molecule)
         system_lammps_data = LammpsData.from_ff_and_topologies(

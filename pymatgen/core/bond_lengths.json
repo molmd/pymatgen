@@ -394,5 +394,41 @@
       "H"
     ],
     "bond_order": 1.0
+  },
+  {
+	  "ref": "",
+	  "length": 1.787,
+	  "elements": [
+		  "Al",
+		  "O"
+	  ],
+	  "bond_order": 1.0
+  },
+  {
+	  "ref": "",
+	  "length": 2.945,
+	  "elements": [
+		  "Al",
+		  "C"
+	  ],
+	  "bond_order": 0.0
+  },
+  {
+	  "ref": "",
+	  "length": 3.376,
+	  "elements": [
+		  "Al",
+		  "F"
+	  ],
+	  "bond_order": 0.0
+  },
+  {
+	  "ref": "",
+	  "length": 3.615,
+	  "elements": [
+		  "Al",
+		  "H"
+	  ],
+	  "bond_order": 0.0
   }
 ]

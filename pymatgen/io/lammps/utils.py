@@ -188,6 +188,7 @@ class PackmolRunner:
         filetype="xyz",
         control_params={"maxit": 20, "nloop": 600},
         auto_box=True,
+        origin=[0.0, 0.0, 0.0],
         output_file="packed.xyz",
         bin="packmol",
         encode=False
@@ -209,6 +210,8 @@ class PackmolRunner:
                     list of parameters containing dicts for each molecule
               auto_box:
                     put the molecule assembly in a box
+              origin:
+                    coordinates for the origin of the box
               output_file:
                     output file name. The extension will be adjusted
                     according to the filetype
@@ -229,6 +232,7 @@ class PackmolRunner:
         self.param_list = param_list
         self.input_file = input_file
         self.boxit = auto_box
+        self.origin = origin
         self.control_params = control_params
         if not self.control_params.get("tolerance"):
             self.control_params["tolerance"] = tolerance
@@ -266,7 +270,12 @@ class PackmolRunner:
             net_volume += (length ** 3.0) * float(self.param_list[idx]["number"])
         length = net_volume ** (1.0 / 3.0)
         for idx, mol in enumerate(self.mols):
-            self.param_list[idx]["inside box"] = "0.0 0.0 0.0 {} {} {}".format(length, length, length)
+            self.param_list[idx]["inside box"] = "{} {} {} {} {} {}".format(self.origin[0],
+                                                                            self.origin[1],
+                                                                            self.origin[2],
+                                                                            self.origin[0] + length,
+                                                                            self.origin[1] + length,
+                                                                            self.origin[2] + length)
 
     def _write_input(self, input_dir="."):
         """
