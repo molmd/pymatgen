@@ -1806,19 +1806,22 @@ class LammpsDataWrapper:
             packmolrunner_inputs parameter. Defaults to 150.
         :param packmolrunner_inputs: [dict] Optional. Parameters for 
             PackmolRunner in pymatgen.io.lammps.utils
-        :param length_increase: [float] Optional. Because packmol will 
-            not always strictly adhere to the box dimensions, this
-            parameter sets the amount to increase the box dimensions by
-            in order to ensure that all molecules are within the box. It
+        :param length_increase: [int, float, or 1x3 array_like] Optional.
+            Because packmol will not always strictly adhere to the box
+            dimensions, this parameter sets the amount to increase the
+            box dimensions by n order to ensure that all molecules are
+            within the box. This is also relevant for interfacial
+            systems where there is a fixed boundary since LAMMPS does
+            not work if the atom is exactly on the boundary. This param
             will increase the length of the box by this amount in the x,
             y, and z directions. In effect, it will decrease the min box
             value by half of its value and increase the max box value by
             half of its value Defaults to 0.5. This means that the min 
             values of x, y, and z will be decreased by 0.25 and the max 
             values of x, y, and z will be increased by 0.25 by default.
-            If using the default value, it might be advisable to set the 
-            origin to [0.25, 0.25, 0.25] to ensure that the true box 
-            origin is at [0,0,0].
+            If using the default value for liquid-only systems, it might
+            be advisable to set the origin to [0.25, 0.25, 0.25] to
+            ensure that the true box origin is at [0,0,0].
         :param check_ff_duplicates: [bool] Optional. If True, the angle,
             dihedral, and improper bond types will be checked for 
             duplicates (eg, for angles, the following two types are 
@@ -1895,6 +1898,15 @@ class LammpsDataWrapper:
         self.xyz_high = [bound[1] for bound in self._initial_lammps_box.as_dict()["bounds"]]
         self.xyz_low = [bound[0] for bound in self._initial_lammps_box.as_dict()["bounds"]]
 
+        if type(length_increase) in [int, float]:
+            self._length_increase_vector = [length_increase] * 3
+        elif len(length_increase) == 3:
+            self._length_increase_vector = length_increase
+        else:
+            raise ValueError(
+                "The length_increase parameter is not valid. It should be a \
+                float or int or a list of 3 floats or ints."
+            )
         self._length_increase = length_increase
         self._check_ff_duplicates = check_ff_duplicates
 
@@ -2173,8 +2185,8 @@ class LammpsDataWrapper:
         :param system_molecule: [Molecule] Output from _run_packmol()
         :return Mix_lmpbox: [pmg.LammpsBox] Object representing the simulation box
         """
-        final_xyz_low = np.subtract(self.xyz_low, np.ones(3) * self._length_increase * 0.5)
-        final_xyz_high = np.add(self.xyz_high, np.ones(3) * self._length_increase * 0.5)
+        final_xyz_low = np.subtract(self.xyz_low, np.multiply(self._length_increase_vector, 0.5))
+        final_xyz_high = np.add(self.xyz_high, np.multiply(self._length_increase_vector, 0.5))
         final_bounds = np.asarray([final_xyz_low, final_xyz_high]).transpose()
 
         mix_lmpbox = LammpsBox(final_bounds, self._initial_lammps_box.as_dict()["tilt"])
