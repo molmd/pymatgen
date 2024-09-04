@@ -1,4 +1,3 @@
-# coding: utf-8
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 import random
@@ -146,13 +145,13 @@ class MPResterTest(PymatgenTest):
         syms2 = "Li-Fe-O"
         entries = self.rester.get_entries_in_chemsys(syms)
         entries2 = self.rester.get_entries_in_chemsys(syms2)
-        elements = set([Element(sym) for sym in syms])
+        elements = {Element(sym) for sym in syms}
         for e in entries:
             self.assertIsInstance(e, ComputedEntry)
             self.assertTrue(set(e.composition.elements).issubset(elements))
 
-        e1 = set([i.entry_id for i in entries])
-        e2 = set([i.entry_id for i in entries2])
+        e1 = {i.entry_id for i in entries}
+        e2 = {i.entry_id for i in entries2}
         self.assertTrue(e1 == e2)
 
     def test_get_structure_by_material_id(self):
@@ -326,7 +325,7 @@ class MPResterTest(PymatgenTest):
                         entry.composition,
                         entry.uncorrected_energy + 0.01,
                         parameters=entry.parameters,
-                        entry_id="mod_{}".format(entry.entry_id),
+                        entry_id=f"mod_{entry.entry_id}",
                     )
                 )
         rest_ehulls = self.rester.get_stability(modified_entries)
@@ -412,24 +411,20 @@ class MPResterTest(PymatgenTest):
             self.assertTrue("The reactant" in str(w[-1].message))
 
     def test_download_info(self):
-        material_ids = ["mp-32800", "mp-23494"]
-        task_types = [TaskType.GGA_OPT, TaskType.GGA_UNIFORM]
+        material_ids = ["mvc-2970"]
+        task_types = [TaskType.GGA_OPT, TaskType.GGAU_UNIFORM]
         file_patterns = ["vasprun*", "OUTCAR*"]
         meta, urls = self.rester.get_download_info(material_ids, task_types=task_types, file_patterns=file_patterns)
         self.assertDictEqual(
             dict(meta),
             {
-                "mp-23494": [{"task_id": "mp-1752825", "task_type": "GGA NSCF Uniform"}],
-                "mp-32800": [{"task_id": "mp-739635", "task_type": "GGA NSCF Uniform"}],
+                "mvc-2970": [{"task_id": "mp-1738602", "task_type": "GGA+U NSCF Uniform"}],
             },
         )
-        prefix = "http://labdev-nomad.esc.rzg.mpg.de/fairdi/nomad/mp/api/raw/query?"
-        # previous test
-        # ids = 'mp-23494,mp-688563,mp-32800,mp-746913'
-        ids = "mp-1752825,mp-739635"
         self.assertEqual(
             urls[0],
-            f"{prefix}file_pattern=vasprun*&file_pattern=OUTCAR*&external_id={ids}",
+            "https://nomad-lab.eu/prod/rae/api/raw/query?file_pattern=vasprun*&file_pattern=OUTCAR*&external_id=mp"
+            "-1738602",
         )
 
     def test_parse_criteria(self):
@@ -481,8 +476,8 @@ class MPResterTest(PymatgenTest):
 
         self.assertIsInstance(db_version, str)
 
-        with open(SETTINGS_FILE, "rt") as f:
-            d = yaml.safe_load(f)
+        with open(SETTINGS_FILE) as f:
+            d = yaml.load(f)
 
         self.assertEqual(d["MAPI_DB_VERSION"]["LAST_ACCESSED"], db_version)
         self.assertIsInstance(d["MAPI_DB_VERSION"]["LOG"][db_version], int)

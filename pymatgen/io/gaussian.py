@@ -1,4 +1,3 @@
-# coding: utf-8
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
@@ -14,9 +13,9 @@ import scipy.constants as cst
 from monty.io import zopen
 
 from pymatgen.core.composition import Composition
+from pymatgen.core.operations import SymmOp
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.structure import Molecule
-from pymatgen.core.operations import SymmOp
 from pymatgen.core.units import Ha_to_eV
 from pymatgen.electronic_structure.core import Spin
 from pymatgen.util.coord import get_angle
@@ -162,7 +161,7 @@ class GaussianInput:
         """
         Args:
             mol: Input molecule. It can either be a Molecule object,
-                a string giving the geometry in a format supported by Guassian,
+                a string giving the geometry in a format supported by Gaussian,
                 or ``None``. If the molecule is ``None``, you will need to use
                 read it in from a checkpoint. Consider adding ``CHK`` to the
                 ``link0_parameters``.
@@ -447,30 +446,28 @@ class GaussianInput:
         outputvar = []
         for i, site in enumerate(self._mol):
             if i == 0:
-                output.append("{}".format(site.specie))
+                output.append(f"{site.specie}")
             elif i == 1:
                 nn = self._find_nn_pos_before_site(i)
                 bondlength = self._mol.get_distance(i, nn[0])
-                output.append("{} {} B{}".format(self._mol[i].specie, nn[0] + 1, i))
-                outputvar.append("B{}={:.6f}".format(i, bondlength))
+                output.append(f"{self._mol[i].specie} {nn[0] + 1} B{i}")
+                outputvar.append(f"B{i}={bondlength:.6f}")
             elif i == 2:
                 nn = self._find_nn_pos_before_site(i)
                 bondlength = self._mol.get_distance(i, nn[0])
                 angle = self._mol.get_angle(i, nn[0], nn[1])
-                output.append("{} {} B{} {} A{}".format(self._mol[i].specie, nn[0] + 1, i, nn[1] + 1, i))
-                outputvar.append("B{}={:.6f}".format(i, bondlength))
-                outputvar.append("A{}={:.6f}".format(i, angle))
+                output.append(f"{self._mol[i].specie} {nn[0] + 1} B{i} {nn[1] + 1} A{i}")
+                outputvar.append(f"B{i}={bondlength:.6f}")
+                outputvar.append(f"A{i}={angle:.6f}")
             else:
                 nn = self._find_nn_pos_before_site(i)
                 bondlength = self._mol.get_distance(i, nn[0])
                 angle = self._mol.get_angle(i, nn[0], nn[1])
                 dih = self._mol.get_dihedral(i, nn[0], nn[1], nn[2])
-                output.append(
-                    "{} {} B{} {} A{} {} D{}".format(self._mol[i].specie, nn[0] + 1, i, nn[1] + 1, i, nn[2] + 1, i)
-                )
-                outputvar.append("B{}={:.6f}".format(i, bondlength))
-                outputvar.append("A{}={:.6f}".format(i, angle))
-                outputvar.append("D{}={:.6f}".format(i, dih))
+                output.append(f"{self._mol[i].specie} {nn[0] + 1} B{i} {nn[1] + 1} A{i} {nn[2] + 1} D{i}")
+                outputvar.append(f"B{i}={bondlength:.6f}")
+                outputvar.append(f"A{i}={angle:.6f}")
+                outputvar.append(f"D{i}={dih:.6f}")
         return "\n".join(output) + "\n\n" + "\n".join(outputvar)
 
     def get_cart_coords(self):
@@ -493,7 +490,7 @@ class GaussianInput:
         """
         Return GaussianInput string
 
-        Option: whe cart_coords sets to True return the cartesian coordinates
+        Option: when cart_coords is set to True return the cartesian coordinates
                 instead of the z-matrix
 
         """
@@ -506,9 +503,9 @@ class GaussianInput:
                     para_str.append(par)
                 elif isinstance(val, dict):
                     val_str = para_dict_to_string(val, joiner=",")
-                    para_str.append("{}=({})".format(par, val_str))
+                    para_str.append(f"{par}=({val_str})")
                 else:
-                    para_str.append("{}={}".format(par, val))
+                    para_str.append(f"{par}={val}")
             return joiner.join(para_str)
 
         output = []
@@ -520,10 +517,10 @@ class GaussianInput:
         bset_str = "" if self.basis_set is None else self.basis_set.strip()
 
         if func_str != "" and bset_str != "":
-            func_bset_str = " {}/{}".format(func_str, bset_str)
+            func_bset_str = f" {func_str}/{bset_str}"
         else:
             # don't use the slash if either or both are set as empty
-            func_bset_str = " {}{}".format(func_str, bset_str).rstrip()
+            func_bset_str = f" {func_str}{bset_str}".rstrip()
 
         output.append(
             "{diez}{func_bset} {route}".format(
@@ -538,7 +535,7 @@ class GaussianInput:
 
         charge_str = "" if self.charge is None else "%d" % self.charge
         multip_str = "" if self.spin_multiplicity is None else " %d" % self.spin_multiplicity
-        output.append("{}{}".format(charge_str, multip_str))
+        output.append(f"{charge_str}{multip_str}")
 
         if isinstance(self._mol, Molecule):
             if cart_coords is True:
@@ -549,7 +546,7 @@ class GaussianInput:
             output.append(str(self._mol))
         output.append("")
         if self.gen_basis is not None:
-            output.append("{:s}\n".format(self.gen_basis))
+            output.append(f"{self.gen_basis}\n")
         output.append(para_dict_to_string(self.input_parameters, "\n"))
         output.append("\n")
         return "\n".join(output)
@@ -926,8 +923,8 @@ class GaussianOutput:
         routeline = ""
         standard_orientation = False
         parse_bond_order = False
-        input_structures = list()
-        std_structures = list()
+        input_structures = []
+        std_structures = []
         geom_orientation = None
         read_esp = False
         read_tensor = False
@@ -1065,7 +1062,7 @@ class GaussianOutput:
                                         ("Density Matrix:" in line or
                                          mo_coeff_patt.search(line)):
                                     end_mo = True
-                                    warnings.warn("POP=regular case, matrix " "coefficients not complete")
+                                    warnings.warn("POP=regular case, matrix coefficients not complete")
                             f.readline()
 
                         self.eigenvectors = mat_mo
@@ -1166,12 +1163,12 @@ class GaussianOutput:
                         line = f.readline()
                         line = f.readline()
                         nat = len(input_structures[0])
-                        matrix = list()
+                        matrix = []
                         for iat in range(nat):
                             line = f.readline()
                             matrix.append([float(v) for v in line.split()[2:]])
 
-                        self.bond_orders = dict()
+                        self.bond_orders = {}
                         for iat in range(nat):
                             for jat in range(iat + 1, nat):
                                 self.bond_orders[(iat, jat)] = matrix[iat][jat]
@@ -1184,7 +1181,7 @@ class GaussianOutput:
                             terminated = True
                     elif error_patt.search(line):
                         error_defs = {
-                            "! Non-Optimized Parameters !": "Optimization " "error",
+                            "! Non-Optimized Parameters !": "Optimization error",
                             "Convergence failure": "SCF convergence error",
                         }
                         m = error_patt.search(line)
@@ -1346,7 +1343,7 @@ class GaussianOutput:
 
         if energy_patt.search(line):
             m = energy_patt.search(line)
-            self.pcm["{} energy".format(m.group(1))] = float(m.group(2))
+            self.pcm[f"{m.group(1)} energy"] = float(m.group(2))
         elif total_patt.search(line):
             m = total_patt.search(line)
             self.pcm["Total energy"] = float(m.group(1))
@@ -1437,7 +1434,7 @@ class GaussianOutput:
 #         conv_patt = re.compile(r"\s") # not sure if this is correct or the next line is
         coord_patt = re.compile(r"^\s*(\w+)((\s*[+-]?\d+\.\d+)+)")
         # data dict return
-        data = {"energies": list(), "coords": dict()}
+        data = {"energies": [], "coords": {}}
 
         # read in file
         with zopen(self.filename, "r") as f:
@@ -1465,7 +1462,7 @@ class GaussianOutput:
 
                 elif scan_patt.match(line):
                     line = f.readline()
-                    data["coords"] = {icname: list() for icname in line.split()[1:-1]}
+                    data["coords"] = {icname: [] for icname in line.split()[1:-1]}
                     f.readline()
                     line = f.readline()
                     while not re.search(r"^\s-+", line):
@@ -1529,7 +1526,7 @@ class GaussianOutput:
                     [(energie (eV), lambda (nm), oscillatory strength), ... ]
         """
 
-        transitions = list()
+        transitions = []
 
         # read in file
         with zopen(self.filename, "r") as f:
@@ -1571,8 +1568,8 @@ class GaussianOutput:
 
         transitions = self.read_excitation_energies()
 
-        minval = min([val[0] for val in transitions]) - 5.0 * sigma
-        maxval = max([val[0] for val in transitions]) + 5.0 * sigma
+        minval = min(val[0] for val in transitions) - 5.0 * sigma
+        maxval = max(val[0] for val in transitions) + 5.0 * sigma
         npts = int((maxval - minval) / step) + 1
 
         eneval = np.linspace(minval, maxval, npts)  # in eV

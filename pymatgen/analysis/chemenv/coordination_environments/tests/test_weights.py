@@ -23,13 +23,7 @@ from pymatgen.analysis.chemenv.coordination_environments.structure_environments 
 from pymatgen.util.testing import PymatgenTest
 
 se_files_dir = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "..",
-    "..",
-    "..",
-    "..",
-    "test_files",
+    PymatgenTest.TEST_FILES_DIR,
     "chemenv",
     "structure_environments_files",
 )
@@ -258,7 +252,7 @@ class StrategyWeightsTest(PymatgenTest):
 
     def test_self_csms_weight(self):
         # Get the StructureEnvironments for K2NaNb2Fe7Si8H4O31 (mp-743972)
-        f = open(os.path.join(se_files_dir, "se_mp-743972.json"), "r")
+        f = open(os.path.join(se_files_dir, "se_mp-743972.json"))
         dd = json.load(f)
         f.close()
         se = StructureEnvironments.from_dict(dd)
@@ -335,7 +329,7 @@ class StrategyWeightsTest(PymatgenTest):
         self.assertAlmostEqual(self_w, 0.14204073172729198, delta=1e-8)
 
         # Get the StructureEnvironments for SiO2 (mp-7000)
-        f = open(os.path.join(se_files_dir, "se_mp-7000.json"), "r")
+        f = open(os.path.join(se_files_dir, "se_mp-7000.json"))
         dd = json.load(f)
         f.close()
         se = StructureEnvironments.from_dict(dd)
@@ -380,7 +374,7 @@ class StrategyWeightsTest(PymatgenTest):
 
     def test_delta_csms_weight(self):
         # Get the StructureEnvironments for K2NaNb2Fe7Si8H4O31 (mp-743972)
-        f = open(os.path.join(se_files_dir, "se_mp-743972.json"), "r")
+        f = open(os.path.join(se_files_dir, "se_mp-743972.json"))
         dd = json.load(f)
         f.close()
         se = StructureEnvironments.from_dict(dd)
@@ -513,7 +507,7 @@ class StrategyWeightsTest(PymatgenTest):
         self.assertAlmostEqual(delta_w, 0.103515625, delta=1e-8)
 
         # Get the StructureEnvironments for SiO2 (mp-7000)
-        f = open(os.path.join(se_files_dir, "se_mp-7000.json"), "r")
+        f = open(os.path.join(se_files_dir, "se_mp-7000.json"))
         dd = json.load(f)
         f.close()
         se = StructureEnvironments.from_dict(dd)

@@ -1,4 +1,3 @@
-# coding: utf-8
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
@@ -433,7 +432,7 @@ def rotateCoords(coords, R):
     :param R: Rotation matrix
     :return: List of rotated points
     """
-    newlist = list()
+    newlist = []
     for pp in coords:
         rpp = matrixTimesVector(R, pp)
         newlist.append(rpp)
@@ -466,7 +465,7 @@ def changebasis(uu, vv, nn, pps):
         MM[ii, 1] = vv[ii]
         MM[ii, 2] = nn[ii]
     PP = np.linalg.inv(MM)
-    newpps = list()
+    newpps = []
     for pp in pps:
         newpps.append(matrixTimesVector(PP, pp))
     return newpps
@@ -501,7 +500,7 @@ def anticlockwise_sort(pps):
     :param pps: List of points to be sorted
     :return: Sorted list of points
     """
-    newpps = list()
+    newpps = []
     angles = np.zeros(len(pps), np.float_)
     for ipp, pp in enumerate(pps):
         angles[ipp] = np.arctan2(pp[1], pp[0])
@@ -677,12 +676,12 @@ class Plane:
         :return: String representation of the Plane object
         """
         outs = ["Plane object"]
-        outs.append("  => Normal vector : {nn}".format(nn=self.normal_vector))
+        outs.append(f"  => Normal vector : {self.normal_vector}")
         outs.append("  => Equation of the plane ax + by + cz + d = 0")
-        outs.append("     with a = {v}".format(v=self._coefficients[0]))
-        outs.append("          b = {v}".format(v=self._coefficients[1]))
-        outs.append("          c = {v}".format(v=self._coefficients[2]))
-        outs.append("          d = {v}".format(v=self._coefficients[3]))
+        outs.append(f"     with a = {self._coefficients[0]}")
+        outs.append(f"          b = {self._coefficients[1]}")
+        outs.append(f"          c = {self._coefficients[2]}")
+        outs.append(f"          d = {self._coefficients[3]}")
         return "\n".join(outs)
 
     def is_in_plane(self, pp, dist_tolerance):
@@ -724,9 +723,9 @@ class Plane:
         :return: The lists of indices of the points on one side of the plane, on the plane and
             on the other side of the plane
         """
-        side1 = list()
-        inplane = list()
-        side2 = list()
+        side1 = []
+        inplane = []
+        side2 = []
         for ip, pp in enumerate(points):
             if self.is_in_plane(pp, dist_tolerance):
                 inplane.append(ip)
@@ -862,11 +861,11 @@ class Plane:
         proj = self.projectionpoints(pps)
         [u1, u2, u3] = self.orthonormal_vectors()
         PP = np.array([[u1[0], u2[0], u3[0]], [u1[1], u2[1], u3[1]], [u1[2], u2[2], u3[2]]])
-        xypps = list()
+        xypps = []
         for pp in proj:
             xyzpp = np.dot(pp, PP)
             xypps.append(xyzpp[0:2])
-        if str(plane_center) == str("mean"):
+        if str(plane_center) == "mean":
             mean = np.zeros(2, np.float_)
             for pp in xypps:
                 mean += pp
@@ -1013,7 +1012,7 @@ class Plane:
         :param points: List of points.
         :return: Plane.
         """
-        mean_point = np.array([sum([pp[ii] for pp in points]) for ii in range(3)], np.float_)
+        mean_point = np.array([sum(pp[ii] for pp in points) for ii in range(3)], np.float_)
         mean_point /= len(points)
         AA = np.zeros((len(points), 3), np.float_)
         for ii, pp in enumerate(points):

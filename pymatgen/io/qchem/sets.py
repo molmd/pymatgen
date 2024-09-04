@@ -1,4 +1,3 @@
-# coding: utf-8
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
@@ -8,6 +7,7 @@ Input sets for Qchem
 
 import logging
 import os
+import sys
 from typing import Dict, List, Optional
 
 from monty.io import zopen
@@ -15,6 +15,11 @@ from monty.io import zopen
 from pymatgen.core.structure import Molecule
 from pymatgen.io.qchem.inputs import QCInput
 from pymatgen.io.qchem.utils import lower_and_check_unique
+
+if sys.version_info >= (3, 8):
+    from typing import Literal
+else:
+    from typing_extensions import Literal
 
 __author__ = "Samuel Blau, Brandon Wood, Shyam Dwaraknath, Evan Spotte-Smith, Ryan Kingsbury"
 __copyright__ = "Copyright 2018-2021, The Materials Project"
@@ -45,7 +50,7 @@ class QChemDictSet(QCInput):
         plot_cubes: bool = False,
         nbo_params: Optional[Dict] = None,
         overwrite_inputs: Optional[Dict] = None,
-        vdw_mode: str = "atomic",
+        vdw_mode: Literal["atomic", "sequential"] = "atomic",
     ):
         """
         Args:
@@ -65,7 +70,7 @@ class QChemDictSet(QCInput):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -79,7 +84,7 @@ class QChemDictSet(QCInput):
                 electronegative halogenicity"
                 Refer to the QChem manual for further details.
             opt_variables (dict): A dictionary of opt sections, where each opt section is a key
-                and the corresponding values are a list of strings. Stings must be formatted
+                and the corresponding values are a list of strings. Strings must be formatted
                 as instructed by the QChem manual. The different opt sections are: CONSTRAINT, FIXED,
                 DUMMY, and CONNECT.
 
@@ -110,12 +115,11 @@ class QChemDictSet(QCInput):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
-                In 'sequential' mode, dict keys represent the sequential position of a single
-                specific atom in the input structure.
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies
+                only if you are using overwrite_inputs to add a $van_der_waals section to the input.
+                In 'atomic' mode (default), dict keys represent the atomic number associated with each
+                radius (e.g., '12' = carbon). In 'sequential' mode, dict keys represent the sequential
+                position of a single specific atom in the input structure.
         """
         self.molecule = molecule
         self.job_type = job_type
@@ -145,21 +149,21 @@ class QChemDictSet(QCInput):
         plots_defaults = {"grid_spacing": "0.05", "total_density": "0"}
 
         if self.opt_variables is None:
-            myopt = dict()
+            myopt = {}
         else:
             myopt = self.opt_variables
 
         if self.scan_variables is None:
-            myscan = dict()
+            myscan = {}
         else:
             myscan = self.scan_variables
 
-        mypcm = dict()
-        mysolvent = dict()
-        mysmx = dict()
-        myvdw = dict()
-        myplots = dict()
-        myrem = dict()
+        mypcm = {}
+        mysolvent = {}
+        mysmx = {}
+        myvdw = {}
+        myplots = {}
+        myrem = {}
         myrem["job_type"] = job_type
         myrem["basis"] = self.basis_set
         myrem["max_scf_cycles"] = str(self.max_scf_cycles)
@@ -202,7 +206,7 @@ class QChemDictSet(QCInput):
                 mysmx["solvent"] = self.smd_solvent
             myrem["solvent_method"] = "smd"
             myrem["ideriv"] = "1"
-            if self.smd_solvent == "custom" or self.smd_solvent == "other":
+            if self.smd_solvent in ("custom", "other"):
                 if self.custom_smd is None:
                     raise ValueError(
                         "A user-defined SMD requires passing custom_smd, a string"
@@ -280,7 +284,7 @@ class QChemDictSet(QCInput):
             input_file (str): Filename
         """
         self.write_file(input_file)
-        if self.smd_solvent == "custom" or self.smd_solvent == "other":
+        if self.smd_solvent in ("custom", "other"):
             with zopen(os.path.join(os.path.dirname(input_file), "solvent_data"), "wt") as f:
                 f.write(self.custom_smd)
 
@@ -303,7 +307,7 @@ class SinglePointSet(QChemDictSet):
         plot_cubes: bool = False,
         nbo_params: Optional[Dict] = None,
         overwrite_inputs: Optional[Dict] = None,
-        vdw_mode: str = "atomic",
+        vdw_mode: Literal["atomic", "sequential"] = "atomic",
     ):
         """
         Args:
@@ -324,7 +328,7 @@ class SinglePointSet(QChemDictSet):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -354,12 +358,11 @@ class SinglePointSet(QChemDictSet):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
-                In 'sequential' mode, dict keys represent the sequential position of a single
-                specific atom in the input structure.
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies
+                only if you are using overwrite_inputs to add a $van_der_waals section to the input.
+                In 'atomic' mode (default), dict keys represent the atomic number associated with each
+                radius (e.g., '12' = carbon). In 'sequential' mode, dict keys represent the sequential
+                position of a single specific atom in the input structure.
         """
         self.basis_set = basis_set
         self.scf_algorithm = scf_algorithm
@@ -401,7 +404,7 @@ class OptSet(QChemDictSet):
         opt_variables: Optional[Dict[str, List]] = None,
         geom_opt_max_cycles: int = 200,
         overwrite_inputs: Optional[Dict] = None,
-        vdw_mode: str = "atomic",
+        vdw_mode: Literal["atomic", "sequential"] = "atomic",
     ):
         """
         Args:
@@ -422,7 +425,7 @@ class OptSet(QChemDictSet):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -453,12 +456,11 @@ class OptSet(QChemDictSet):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
-                In 'sequential' mode, dict keys represent the sequential position of a single
-                specific atom in the input structure.
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies
+                only if you are using overwrite_inputs to add a $van_der_waals section to the input.
+                In 'atomic' mode (default), dict keys represent the atomic number associated with each
+                radius (e.g., '12' = carbon). In 'sequential' mode, dict keys represent the sequential
+                position of a single specific atom in the input structure.
         """
         self.basis_set = basis_set
         self.scf_algorithm = scf_algorithm
@@ -521,7 +523,7 @@ class TransitionStateSet(QChemDictSet):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -552,12 +554,11 @@ class TransitionStateSet(QChemDictSet):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
-                In 'sequential' mode, dict keys represent the sequential position of a single
-                specific atom in the input structure.
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies
+                only if you are using overwrite_inputs to add a $van_der_waals section to the input.
+                In 'atomic' mode (default), dict keys represent the atomic number associated with each
+                radius (e.g., '12' = carbon). In 'sequential' mode, dict keys represent the sequential
+                position of a single specific atom in the input structure.
         """
         self.basis_set = basis_set
         self.scf_algorithm = scf_algorithm
@@ -600,7 +601,7 @@ class ForceSet(QChemDictSet):
         plot_cubes: bool = False,
         nbo_params: Optional[Dict] = None,
         overwrite_inputs: Optional[Dict] = None,
-        vdw_mode: str = "atomic",
+        vdw_mode: Literal["atomic", "sequential"] = "atomic",
     ):
         """
         Args:
@@ -618,7 +619,7 @@ class ForceSet(QChemDictSet):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -649,12 +650,11 @@ class ForceSet(QChemDictSet):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
-                In 'sequential' mode, dict keys represent the sequential position of a single
-                specific atom in the input structure.
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies
+                only if you are using overwrite_inputs to add a $van_der_waals section to the input.
+                In 'atomic' mode (default), dict keys represent the atomic number associated with each
+                radius (e.g., '12' = carbon). In 'sequential' mode, dict keys represent the sequential
+                position of a single specific atom in the input structure.
         """
         self.basis_set = basis_set
         self.scf_algorithm = scf_algorithm
@@ -694,7 +694,7 @@ class FreqSet(QChemDictSet):
         plot_cubes: bool = False,
         nbo_params: Optional[Dict] = None,
         overwrite_inputs: Optional[Dict] = None,
-        vdw_mode: str = "atomic",
+        vdw_mode: Literal["atomic", "sequential"] = "atomic",
     ):
         """
         Args:
@@ -712,7 +712,7 @@ class FreqSet(QChemDictSet):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -743,12 +743,11 @@ class FreqSet(QChemDictSet):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
-                In 'sequential' mode, dict keys represent the sequential position of a single
-                specific atom in the input structure.
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies
+                only if you are using overwrite_inputs to add a $van_der_waals section to the input.
+                In 'atomic' mode (default), dict keys represent the atomic number associated with each
+                radius (e.g., '12' = carbon). In 'sequential' mode, dict keys represent the sequential
+                position of a single specific atom in the input structure.
         """
         self.basis_set = basis_set
         self.scf_algorithm = scf_algorithm
@@ -796,13 +795,13 @@ class PESScanSet(QChemDictSet):
         opt_variables: Optional[Dict[str, List]] = None,
         scan_variables: Optional[Dict[str, List]] = None,
         overwrite_inputs: Optional[Dict] = None,
-        vdw_mode: str = "atomic",
+        vdw_mode: Literal["atomic", "sequential"] = "atomic",
     ):
         """
         Args:
             molecule (Pymatgen Molecule object)
             opt_variables (dict): A dictionary of opt sections, where each opt section is a key
-                and the corresponding values are a list of strings. Stings must be formatted
+                and the corresponding values are a list of strings. Strings must be formatted
                 as instructed by the QChem manual. The different opt sections are: CONSTRAINT, FIXED,
                 DUMMY, and CONNECT.
 
@@ -826,7 +825,7 @@ class PESScanSet(QChemDictSet):
                 argument to {"method":"<NAME OF FUNCTIONAL>"}
 
                 **Note that the "rungs" in this argument do NOT correspond to rungs on "Jacob's
-                Ladder of Density Functional Approxmations"**
+                Ladder of Density Functional Approximations"**
             pcm_dielectric (float): Dielectric constant to use for PCM implicit solvation model. (Default: None)
             smd_solvent (str): Solvent to use for SMD implicit solvation model. (Default: None)
                 Examples include "water", "ethanol", "methanol", and "acetonitrile". Refer to the QChem
@@ -857,10 +856,9 @@ class PESScanSet(QChemDictSet):
                 the PCM "radii" setting to "read".**
 
                 **Note that all keys must be given as strings, even when they are numbers!**
-            vdw_mode (str): Method of specifying custom van der Waals radii. Applies only if
-                you are using overwrite_inputs to add a $van_der_waals section to the input.
-                Valid value are 'atomic' and 'sequential'. In 'atomic' mode (default), dict
-                keys represent the atomic number associated with each radius (e.g., '12' = carbon).
+            vdw_mode ('atomic' | 'sequential'): Method of specifying custom van der Waals radii. Applies only if
+                you are using overwrite_inputs to add a $van_der_waals section to the input. In 'atomic' mode
+                (default), dict keys represent the atomic number associated with each radius (e.g., '12' = carbon).
                 In 'sequential' mode, dict keys represent the sequential position of a single
                 specific atom in the input structure.
         """
@@ -869,7 +867,7 @@ class PESScanSet(QChemDictSet):
         self.max_scf_cycles = max_scf_cycles
 
         if scan_variables is None:
-            raise ValueError("Cannot run a pes_scan job without some variable " "to scan over!")
+            raise ValueError("Cannot run a pes_scan job without some variable to scan over!")
 
         super().__init__(
             molecule=molecule,

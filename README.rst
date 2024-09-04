@@ -1,6 +1,6 @@
 .. image:: https://github.com/materialsproject/pymatgen/actions/workflows/test.yml/badge.svg
       :alt: CI Status
-      :target: https://github.com/materialsproject/pymatgen/actions/workflows/test.yml
+      :target: https://github.com/materialsproject/pymatgen/actions/workflows/test-linux.yml
 
 .. image:: https://anaconda.org/conda-forge/pymatgen/badges/downloads.svg
       :alt: Conda Downloads
@@ -77,7 +77,7 @@ Why use pymatgen?
 1. **It is (fairly) robust.** Pymatgen is used by thousands of researchers, and is the analysis code powering the
    `Materials Project`_. The analysis it produces survives rigorous scrutiny every single day. Bugs tend to be
    found and corrected quickly. Pymatgen also uses Github Actions for continuous integration, which ensures that every
-   new code passes a comprehensive suite of unittests.
+   new code passes a comprehensive suite of unit tests.
 2. **It is well documented.** A fairly comprehensive documentation has been written to help you get to grips with it
    quickly.
 3. **It is open.** You are free to use and contribute to pymatgen. It also means that pymatgen is continuously being
@@ -89,6 +89,10 @@ Why use pymatgen?
 5. **It will be around.** Pymatgen is not a pet research project. It is used in the well-established Materials Project.
    It is also actively being developed and maintained by the `Materials Virtual Lab`_, the ABINIT group and many
    other research groups.
+6. **A growing ecosystem of developers and add-ons**. Pymatgen has contributions from materials scientists all over the
+   world. We also now have an architecture to support add-ons that expand pymatgen's functionality even further. Check
+   out the `contributing page <http://pymatgen.org/contributing>`_ and `add-ons page <http://pymatgen.org/addons>`_ for
+   details and examples.
 
 Getting pymatgen
 ================
@@ -130,7 +134,7 @@ work:
     Persson, Gerbrand Ceder. *Python Materials Genomics (pymatgen) : A Robust,
     Open-Source Python Library for Materials Analysis.* Computational
     Materials Science, 2013, 68, 314-319. `doi:10.1016/j.commatsci.2012.10.028
-    <http://dx.doi.org/10.1016/j.commatsci.2012.10.028>`_
+    <https://doi.org/10.1016/j.commatsci.2012.10.028>`_
 
 In addition, some of pymatgen's functionality is based on scientific advances
 / principles developed by the computational materials scientists in our team.

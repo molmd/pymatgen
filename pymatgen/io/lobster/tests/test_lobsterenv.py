@@ -26,116 +26,189 @@ class TestLobsterNeighbors(unittest.TestCase):
 
         self.chemenvlobster1 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=1,
         )
 
         # all bonds
         self.chemenvlobster0 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=0,
         )
 
         # only cation cation, anion anion bonds
         self.chemenvlobster5 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=5,
         )
 
         # only cation cation bonds
         self.chemenvlobster6 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=6,
         )
 
         # 2,3,4 are not tested so far
         self.chemenvlobster2 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=2,
         )
 
         self.chemenvlobster3 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=3,
         )
 
         self.chemenvlobster4 = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=4,
         )
 
         # search for other testcase where 2,3,4 arrive at different results
         self.chemenvlobster0_second = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             additional_condition=0,
         )
         self.chemenvlobster1_second = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             additional_condition=1,
         )
 
         self.chemenvlobster2_second = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             additional_condition=2,
         )
 
         self.chemenvlobster5_second = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             additional_condition=5,
         )
 
         self.chemenvlobster5_second_percentage = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             additional_condition=5,
             perc_strength_ICOHP=1.0,
         )
 
         self.chemenvlobster6_second = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             additional_condition=6,
         )
 
         # TODO: use charge instead of valence
         self.chemenvlobster1_charges = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             valences_from_charges=True,
             filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
             additional_condition=1,
+        )
+        self.chemenvlobster6_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=6,
+            adapt_extremum_to_add_cond=True,
+        )
+        self.chemenvlobster5_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=5,
+            adapt_extremum_to_add_cond=True,
+        )
+        self.chemenvlobster4_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=4,
+            adapt_extremum_to_add_cond=True,
+        )
+        self.chemenvlobster3_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=3,
+            adapt_extremum_to_add_cond=True,
+        )
+        self.chemenvlobster2_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=2,
+            adapt_extremum_to_add_cond=True,
+        )
+        self.chemenvlobster1_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=1,
+            adapt_extremum_to_add_cond=True,
+        )
+
+        self.chemenvlobster0_charges_additional_condition = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
+            additional_condition=0,
+            adapt_extremum_to_add_cond=True,
+        )
+        self.chemenvlobster0_NaSi = LobsterNeighbors(
+            are_coops=False,
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.NaSi.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.NaSi.gz")),
+            valences_from_charges=True,
+            filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.NaSi.gz"),
+            additional_condition=0,
+            adapt_extremum_to_add_cond=True,
         )
 
     def test_use_of_coop(self):
         with self.assertRaises(ValueError):
             test = LobsterNeighbors(
                 are_coops=True,
-                filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-                structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+                filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+                structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
                 valences_from_charges=True,
                 filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
                 additional_condition=1,
@@ -145,28 +218,24 @@ class TestLobsterNeighbors(unittest.TestCase):
         with self.assertRaises(ValueError):
             test = LobsterNeighbors(
                 are_coops=False,
-                filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-                structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+                filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+                structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
                 valences_from_charges=True,
                 filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
                 additional_condition=10,
             )
 
-    def test_no_bva_possible(self):
-        pass
-        # TODO: write something where not BondValenceAnalysis can be done (provide a certain structure where it cannot
-        # be done)
-
     def test_set_limits(self):
         test = LobsterNeighbors(
             are_coops=False,
-            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")),
+            filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_353.gz"),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")),
             valences_from_charges=True,
             filename_CHARGE=os.path.join(test_dir_env, "CHARGE.lobster.mp-353.gz"),
             additional_condition=1,
             limits=[-100000, 0],
         )
+        self.assertListEqual(test.limits, [-100000, 0])
 
     def test_molecules_allowed(self):
         self.chemenvlobster1.molecules_allowed
@@ -185,7 +254,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster0.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             6,
@@ -193,7 +262,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster0.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             2,
@@ -202,7 +271,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster1.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             6,
@@ -210,7 +279,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster1.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             2,
@@ -219,7 +288,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster2.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             6,
@@ -227,7 +296,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster2.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             2,
@@ -236,7 +305,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster3.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             6,
@@ -244,7 +313,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster3.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             2,
@@ -253,7 +322,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster4.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             6,
@@ -261,7 +330,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster4.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             2,
@@ -270,7 +339,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster5.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             0,
@@ -278,7 +347,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster5.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             0,
@@ -287,15 +356,16 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster6.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=0
                 )
             ),
             0,
         )
+
         self.assertEqual(
             len(
                 self.chemenvlobster6.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")), n=1
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")), n=1
                 )
             ),
             0,
@@ -307,7 +377,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster0_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
                 )
             ),
             8,
@@ -317,7 +387,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster1_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
                 )
             ),
             2,
@@ -327,7 +397,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster2_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
                 )
             ),
             2,
@@ -335,7 +405,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster2_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=4
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=4
                 )
             ),
             4,
@@ -345,7 +415,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster5_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
                 )
             ),
             6,
@@ -353,7 +423,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster5_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=4
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=4
                 )
             ),
             0,
@@ -362,7 +432,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster6_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
                 )
             ),
             6,
@@ -370,7 +440,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster6_second.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=4
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=4
                 )
             ),
             0,
@@ -379,7 +449,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertEqual(
             len(
                 self.chemenvlobster5_second_percentage.get_nn(
-                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                    structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
                 )
             ),
             0,
@@ -387,14 +457,14 @@ class TestLobsterNeighbors(unittest.TestCase):
 
     def test_structure_graph(self):
         sg = self.chemenvlobster1_second.get_bonded_structure(
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353"))
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz"))
         )
         self.assertEqual(type(sg), StructureGraph)
 
     def test_order_parameter(self):
         self.assertAlmostEqual(
             self.chemenvlobster1_second.get_local_order_parameters(
-                structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353")), n=0
+                structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_353.gz")), n=0
             )["linear"],
             1.0,
         )
@@ -421,7 +491,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         self.assertAlmostEqual(results[2], 6)
         self.assertAlmostEqual(results[3], ["27", "30", "48", "49", "64", "73"])
 
-        results2 = self.chemenvlobster1.get_info_icohps_to_neighbors(isites=[])
+        results2 = self.chemenvlobster1.get_info_icohps_to_neighbors(isites=None)
         self.assertAlmostEqual(results2[0], -33.26058)
         for bond in results2[1]:
             self.assertAlmostEqual(bond, -5.54345, 3)
@@ -483,7 +553,7 @@ class TestLobsterNeighbors(unittest.TestCase):
         chemenvlobster1 = LobsterNeighbors(
             are_coops=False,
             filename_ICOHP=os.path.join(test_dir_env, "ICOHPLIST.lobster.mp_190_2.gz"),
-            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190")),
+            structure=Structure.from_file(os.path.join(test_dir_env, "POSCAR.mp_190.gz")),
             additional_condition=1,
         )
         self.assertEqual(
@@ -542,6 +612,25 @@ class TestLobsterNeighbors(unittest.TestCase):
                 only_bonds_to=["Te"],
             )[1],
             None,
+        )
+
+        self.assertEqual(
+            self.chemenvlobster0_NaSi.get_info_cohps_to_neighbors(
+                path_to_COHPCAR=os.path.join(test_dir_env, "COHPCAR.lobster.NaSi.gz"),
+                isites=[8],
+                onlycation_isites=False,
+                only_bonds_to=["Na"],
+            )[0],
+            "1 x Na-Si (per bond)",
+        )
+        self.assertEqual(
+            self.chemenvlobster0_NaSi.get_info_cohps_to_neighbors(
+                path_to_COHPCAR=os.path.join(test_dir_env, "COHPCAR.lobster.NaSi.gz"),
+                isites=[8],
+                onlycation_isites=False,
+                only_bonds_to=["Si"],
+            )[0],
+            "3 x Si-Si (per bond)",
         )
 
         chemenvlobster1.plot_cohps_of_neighbors(

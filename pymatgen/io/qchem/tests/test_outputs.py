@@ -1,4 +1,3 @@
-# coding: utf-8
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
@@ -217,11 +216,11 @@ class TestQCOutput(PymatgenTest):
 
     def test_all(self):
         self.maxDiff = None
-        single_outs = dict()
+        single_outs = {}
         for file in single_job_out_names:
             single_outs[file] = QCOutput(os.path.join(PymatgenTest.TEST_FILES_DIR, "molecules", file)).data
 
-        multi_outs = dict()
+        multi_outs = {}
         for file in multi_job_out_names:
             multi_outs[file] = QCOutput.multiple_outputs_from_file(
                 QCOutput, os.path.join(PymatgenTest.TEST_FILES_DIR, "molecules", file), keep_sub_files=False
