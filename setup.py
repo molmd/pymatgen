@@ -94,7 +94,8 @@ setup(
         "uncertainties>=3.1.4",
         "Cython>=0.29.23",
         "pybtex",
-        "tqdm"
+        "tqdm",
+        "doepy>=0.0.1",
     ],
     extras_require={
         "ase": ["ase>=3.3"],
