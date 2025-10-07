@@ -186,6 +186,7 @@ class PackmolRunner:
         filetype="xyz",
         control_params={"maxit": 20, "nloop": 600},
         auto_box=True,
+        origin=[0.0, 0.0, 0.0],
         output_file="packed.xyz",
         bin="packmol",
         encode=False
@@ -207,6 +208,8 @@ class PackmolRunner:
                     list of parameters containing dicts for each molecule
               auto_box:
                     put the molecule assembly in a box
+              origin:
+                    coordinates for the origin of the box
               output_file:
                     output file name. The extension will be adjusted
                     according to the filetype
@@ -227,6 +230,7 @@ class PackmolRunner:
         self.param_list = param_list
         self.input_file = input_file
         self.boxit = auto_box
+        self.origin = origin
         self.control_params = control_params
         if not self.control_params.get("tolerance"):
             self.control_params["tolerance"] = tolerance
